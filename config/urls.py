@@ -11,4 +11,5 @@ urlpatterns = [
     path("api/", include("apps.preventive.urls")),
     path("api/", include("apps.indicators.urls")),
     path("api/", include("apps.dashboard.urls")),
+    path("api/", include("apps.sync.urls")),
 ]

@@ -29,6 +29,8 @@ INSTALLED_APPS = [
     "apps.preventive",
     "apps.indicators",
     "apps.dashboard",
+    "apps.sync",
+    "apps.audit",
 ]
 
 MIDDLEWARE = [
@@ -38,6 +40,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.sync.middleware.OfflineIdempotencyMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

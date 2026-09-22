@@ -1,5 +1,5 @@
 import pytest
-from django.test import Client
+from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.equipment.models import Equipment, Service, Localisation
 from apps.preventive.models import MaintenancePlan, MaintenancePreventive
@@ -7,7 +7,7 @@ from apps.preventive.models import MaintenancePlan, MaintenancePreventive
 
 @pytest.fixture
 def api_client():
-    return Client()
+    return APIClient()
 
 
 @pytest.fixture
@@ -56,22 +56,22 @@ def plan():
 
 @pytest.mark.django_db
 def test_create_plan(api_client, biomed_user):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     resp = api_client.post(
         "/api/maintenance-plans/",
         {"nom": "Plan test", "type_equipement": "ECG", "frequence": "MENSUELLE", "delai_jours": 30},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 201
 
 
 @pytest.mark.django_db
 def test_create_preventive_maintenance(api_client, biomed_user, plan, equipment):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     resp = api_client.post(
         "/api/maintenance-preventive/",
         {"plan": plan.id, "equipement": equipment.id, "date_planifiee": "2026-12-01"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 201
     assert resp.json()["statut"] == "PLANIFIEE"
@@ -79,22 +79,22 @@ def test_create_preventive_maintenance(api_client, biomed_user, plan, equipment)
 
 @pytest.mark.django_db
 def test_start_and_finish_preventive(api_client, biomed_user, plan, equipment):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/maintenance-preventive/",
         {"plan": plan.id, "equipement": equipment.id, "date_planifiee": "2026-12-01"},
-        content_type="application/json",
+        format="json",
     )
     mp_id = create_resp.json()["id"]
 
-    resp = api_client.post(f"/api/maintenance-preventive/{mp_id}/start/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/maintenance-preventive/{mp_id}/start/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_COURS"
 
     resp = api_client.post(
         f"/api/maintenance-preventive/{mp_id}/finish/",
         {"commentaire": "Terminée avec succès"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "TERMINEE"
@@ -103,12 +103,12 @@ def test_start_and_finish_preventive(api_client, biomed_user, plan, equipment):
 
 @pytest.mark.django_db
 def test_cannot_finish_not_started(api_client, biomed_user, plan, equipment):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/maintenance-preventive/",
         {"plan": plan.id, "equipement": equipment.id, "date_planifiee": "2026-12-01"},
-        content_type="application/json",
+        format="json",
     )
     mp_id = create_resp.json()["id"]
-    resp = api_client.post(f"/api/maintenance-preventive/{mp_id}/finish/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/maintenance-preventive/{mp_id}/finish/", {}, format="json")
     assert resp.status_code == 400

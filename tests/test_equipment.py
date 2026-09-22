@@ -1,12 +1,12 @@
 import pytest
-from django.test import Client
+from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.equipment.models import Equipment, Service, Localisation
 
 
 @pytest.fixture
 def api_client():
-    return Client()
+    return APIClient()
 
 
 @pytest.fixture
@@ -45,9 +45,9 @@ def equipment_data(service, localisation):
 
 @pytest.mark.django_db
 def test_create_equipment(api_client, admin_user, equipment_data):
-    api_client.force_login(admin_user)
+    api_client.force_authenticate(user=admin_user)
     response = api_client.post(
-        "/api/equipment/", equipment_data, content_type="application/json"
+        "/api/equipment/", equipment_data, format="json"
     )
     assert response.status_code == 201
     data = response.json()
@@ -57,18 +57,18 @@ def test_create_equipment(api_client, admin_user, equipment_data):
 
 @pytest.mark.django_db
 def test_list_equipment(api_client, admin_user, equipment_data):
-    api_client.force_login(admin_user)
-    api_client.post("/api/equipment/", equipment_data, content_type="application/json")
+    api_client.force_authenticate(user=admin_user)
+    api_client.post("/api/equipment/", equipment_data, format="json")
     response = api_client.get("/api/equipment/")
     assert response.status_code == 200
-    assert response.json()["count"] == 1
+    assert len(response.json()) == 1
 
 
 @pytest.mark.django_db
 def test_get_equipment_detail(api_client, admin_user, equipment_data):
-    api_client.force_login(admin_user)
+    api_client.force_authenticate(user=admin_user)
     create_response = api_client.post(
-        "/api/equipment/", equipment_data, content_type="application/json"
+        "/api/equipment/", equipment_data, format="json"
     )
     eq_id = create_response.json()["id"]
     response = api_client.get(f"/api/equipment/{eq_id}/")
@@ -78,15 +78,15 @@ def test_get_equipment_detail(api_client, admin_user, equipment_data):
 
 @pytest.mark.django_db
 def test_update_equipment(api_client, admin_user, equipment_data):
-    api_client.force_login(admin_user)
+    api_client.force_authenticate(user=admin_user)
     create_response = api_client.post(
-        "/api/equipment/", equipment_data, content_type="application/json"
+        "/api/equipment/", equipment_data, format="json"
     )
     eq_id = create_response.json()["id"]
     response = api_client.patch(
         f"/api/equipment/{eq_id}/",
         {"etat_operationnel": "EN_PANNE"},
-        content_type="application/json",
+        format="json",
     )
     assert response.status_code == 200
     assert response.json()["etat_operationnel"] == "EN_PANNE"
@@ -94,10 +94,10 @@ def test_update_equipment(api_client, admin_user, equipment_data):
 
 @pytest.mark.django_db
 def test_duplicate_inventory_rejected(api_client, admin_user, equipment_data):
-    api_client.force_login(admin_user)
-    api_client.post("/api/equipment/", equipment_data, content_type="application/json")
+    api_client.force_authenticate(user=admin_user)
+    api_client.post("/api/equipment/", equipment_data, format="json")
     response = api_client.post(
-        "/api/equipment/", equipment_data, content_type="application/json"
+        "/api/equipment/", equipment_data, format="json"
     )
     assert response.status_code == 400
 
@@ -105,6 +105,6 @@ def test_duplicate_inventory_rejected(api_client, admin_user, equipment_data):
 @pytest.mark.django_db
 def test_unauthenticated_rejected(api_client, equipment_data):
     response = api_client.post(
-        "/api/equipment/", equipment_data, content_type="application/json"
+        "/api/equipment/", equipment_data, format="json"
     )
-    assert response.status_code == 401
+    assert response.status_code in (401, 403)

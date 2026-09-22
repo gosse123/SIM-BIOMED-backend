@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from apps.accounts.permissions import CanReportFailure, CanQualifyFailure, CanDiagnoseFailure, CanCloseFailure
 from .models import Panne
@@ -59,6 +60,12 @@ class PanneViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), CanCloseFailure()]
         return [IsAuthenticated()]
 
+    def create(self, request, *args, **kwargs):
+        serializer = ReportPanneSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        panne = serializer.save()
+        return Response(PanneDetailSerializer(panne).data, status=status.HTTP_201_CREATED)
+
     def perform_transition(self, request, panne_id, new_statut, serializer_class, **extra_fields):
         try:
             panne = Panne.objects.get(pk=panne_id)
@@ -68,9 +75,14 @@ class PanneViewSet(viewsets.ModelViewSet):
         serializer = serializer_class(data=request.data, instance=panne, context={"request": request})
         serializer.is_valid(raise_exception=True)
         panne.statut = new_statut
+        for key, val in serializer.validated_data.items():
+            setattr(panne, key, val)
         for key, val in extra_fields.items():
             setattr(panne, key, val)
-        panne.save()
+        try:
+            panne.save()
+        except DjangoValidationError as e:
+            return Response({"detail": e.message if hasattr(e, 'message') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PanneDetailSerializer(panne).data)
 
     @action(detail=True, methods=["post"])

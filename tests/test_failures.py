@@ -1,5 +1,5 @@
 import pytest
-from django.test import Client
+from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.equipment.models import Equipment, Service, Localisation
 from apps.failures.models import Panne
@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 
 @pytest.fixture
 def api_client():
-    return Client()
+    return APIClient()
 
 
 @pytest.fixture
@@ -64,10 +64,10 @@ def panne_report_data(equipment):
 @pytest.mark.django_db
 def test_full_happy_path(api_client, biomed_user, panne_report_data):
     """Test complet : Signaler → Qualifier → Criticité → Diagnostic → Intervention → Test → Clôturer."""
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
 
     # 1. Signaler
-    resp = api_client.post("/api/pannes/", panne_report_data, content_type="application/json")
+    resp = api_client.post("/api/pannes/", panne_report_data, format="json")
     assert resp.status_code == 201
     panne_id = resp.json()["id"]
 
@@ -75,7 +75,7 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(
         f"/api/pannes/{panne_id}/qualify/",
         {"observation_qualification": "Panne confirmee", "critere_urgence": "Urgence moyenne"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "QUALIFIEE"
@@ -84,7 +84,7 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(
         f"/api/pannes/{panne_id}/evaluate-criticite/",
         {"critere_impact": "Patient en soins intensifs", "niveau_criticite": "ELEVE"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "CRITICITE_EVALUEE"
@@ -94,13 +94,13 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(
         f"/api/pannes/{panne_id}/diagnose/",
         {"description_diagnostic": "Connexion defaillante", "cause_identifiee": "Cable defaillant"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_DIAGNOSTIC"
 
     # 5. Intervention
-    resp = api_client.post(f"/api/pannes/{panne_id}/start-intervention/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/pannes/{panne_id}/start-intervention/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_INTERVENTION"
 
@@ -108,7 +108,7 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(
         f"/api/pannes/{panne_id}/start-test/",
         {"resultat_test": "CONFORME"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_TEST"
@@ -117,7 +117,7 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(
         f"/api/pannes/{panne_id}/close/",
         {"commentaire_cloture": "Intervention OK"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "CLOSE"
@@ -127,7 +127,7 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
 @pytest.mark.django_db
 def test_invalid_transition_rejected(api_client, biomed_user, equipment):
     """On ne peut pas sauter d'etapes."""
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     panne = Panne.objects.create(
         equipement=equipment,
         signale_par=biomed_user,
@@ -137,7 +137,7 @@ def test_invalid_transition_rejected(api_client, biomed_user, equipment):
     resp = api_client.post(
         f"/api/pannes/{panne.id}/start-intervention/",
         {},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 400
 
@@ -145,7 +145,7 @@ def test_invalid_transition_rejected(api_client, biomed_user, equipment):
 @pytest.mark.django_db
 def test_close_without_conform_test_rejected(api_client, biomed_user, equipment):
     """RB-CL-001 : pas de cloture sans test conforme."""
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     panne = Panne.objects.create(
         equipement=equipment,
         signale_par=biomed_user,
@@ -153,14 +153,14 @@ def test_close_without_conform_test_rejected(api_client, biomed_user, equipment)
         statut=Panne.Statut.EN_TEST,
         resultat_test=Panne.ResultatTest.TOUJOURS_EN_PANNE,
     )
-    resp = api_client.post(f"/api/pannes/{panne.id}/close/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/pannes/{panne.id}/close/", {}, format="json")
     assert resp.status_code == 400
 
 
 @pytest.mark.django_db
 def test_qualify_without_observation_rejected(api_client, biomed_user, equipment):
     """RB-PANNE-001 : observation obligatoire pour la qualification."""
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     panne = Panne.objects.create(
         equipement=equipment,
         signale_par=biomed_user,
@@ -170,7 +170,7 @@ def test_qualify_without_observation_rejected(api_client, biomed_user, equipment
     resp = api_client.post(
         f"/api/pannes/{panne.id}/qualify/",
         {"observation_qualification": "", "critere_urgence": "Test"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 400
 
@@ -178,7 +178,7 @@ def test_qualify_without_observation_rejected(api_client, biomed_user, equipment
 @pytest.mark.django_db
 def test_wait_piece_then_resume(api_client, biomed_user, equipment):
     """Test du circuit EN_ATTENTE_PIECE."""
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     panne = Panne.objects.create(
         equipement=equipment,
         signale_par=biomed_user,
@@ -188,20 +188,20 @@ def test_wait_piece_then_resume(api_client, biomed_user, equipment):
         cause_identifiee="Condensateur defaillant",
     )
     # Diagnostique → En attente piece
-    resp = api_client.post(f"/api/pannes/{panne.id}/wait-piece/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/pannes/{panne.id}/wait-piece/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_ATTENTE_PIECE"
 
     # Attente piece → Intervention
-    resp = api_client.post(f"/api/pannes/{panne.id}/start-intervention/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/pannes/{panne.id}/start-intervention/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_INTERVENTION"
 
 
 @pytest.mark.django_db
 def test_list_pannes(api_client, biomed_user, panne_report_data):
-    api_client.force_login(biomed_user)
-    api_client.post("/api/pannes/", panne_report_data, content_type="application/json")
+    api_client.force_authenticate(user=biomed_user)
+    api_client.post("/api/pannes/", panne_report_data, format="json")
     resp = api_client.get("/api/pannes/")
     assert resp.status_code == 200
-    assert resp.json()["count"] == 1
+    assert len(resp.json()) == 1

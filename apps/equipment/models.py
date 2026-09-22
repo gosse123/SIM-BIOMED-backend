@@ -5,6 +5,14 @@ class Service(models.Model):
     """Service hospitalier (RB-EQ-002)."""
     nom = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
+    etablissement = models.ForeignKey(
+        "accounts.Etablissement",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="services",
+        verbose_name="Établissement",
+    )
 
     class Meta:
         verbose_name = "service"
@@ -20,6 +28,14 @@ class Localisation(models.Model):
     batiment = models.CharField(max_length=200)
     etage = models.CharField(max_length=50, blank=True)
     salle = models.CharField(max_length=100)
+    etablissement = models.ForeignKey(
+        "accounts.Etablissement",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="localisations",
+        verbose_name="Établissement",
+    )
 
     class Meta:
         verbose_name = "localisation"
@@ -74,6 +90,14 @@ class Equipment(models.Model):
     # Relations
     service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="equipements")
     localisation = models.ForeignKey(Localisation, on_delete=models.PROTECT, related_name="equipements")
+    etablissement = models.ForeignKey(
+        "accounts.Etablissement",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="equipements",
+        verbose_name="Établissement",
+    )
 
     # Dates
     date_reception = models.DateField(null=True, blank=True)

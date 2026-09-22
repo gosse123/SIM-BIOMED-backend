@@ -32,6 +32,16 @@ class InterventionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(realisee_par=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        intervention = serializer.instance
+        return Response(
+            InterventionDetailSerializer(intervention).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         """Demarrer une intervention."""

@@ -1,5 +1,5 @@
 import pytest
-from django.test import Client
+from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.equipment.models import Equipment, Service, Localisation
 from apps.failures.models import Panne
@@ -8,7 +8,7 @@ from apps.interventions.models import Intervention
 
 @pytest.fixture
 def api_client():
-    return Client()
+    return APIClient()
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def panne(equipment, biomed_user):
 
 @pytest.mark.django_db
 def test_create_intervention(api_client, biomed_user, equipment, panne):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     resp = api_client.post(
         "/api/interventions/",
         {
@@ -66,7 +66,7 @@ def test_create_intervention(api_client, biomed_user, equipment, panne):
             "type_intervention": "CORRECTIVE",
             "description": "Remplacement composant RF",
         },
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 201
     assert resp.json()["statut"] == "PLANIFIEE"
@@ -74,14 +74,14 @@ def test_create_intervention(api_client, biomed_user, equipment, panne):
 
 @pytest.mark.django_db
 def test_start_intervention(api_client, biomed_user, equipment, panne):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
         {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
-        content_type="application/json",
+        format="json",
     )
     intervention_id = create_resp.json()["id"]
-    resp = api_client.post(f"/api/interventions/{intervention_id}/start/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/interventions/{intervention_id}/start/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_COURS"
     assert resp.json()["date_debut"] is not None
@@ -89,18 +89,18 @@ def test_start_intervention(api_client, biomed_user, equipment, panne):
 
 @pytest.mark.django_db
 def test_finish_intervention(api_client, biomed_user, equipment, panne):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
         {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
-        content_type="application/json",
+        format="json",
     )
     intervention_id = create_resp.json()["id"]
-    api_client.post(f"/api/interventions/{intervention_id}/start/", {}, content_type="application/json")
+    api_client.post(f"/api/interventions/{intervention_id}/start/", {}, format="json")
     resp = api_client.post(
         f"/api/interventions/{intervention_id}/finish/",
         {"temps_passe_minutes": 120, "pieces_utilisees": "Condensateur X200"},
-        content_type="application/json",
+        format="json",
     )
     assert resp.status_code == 200
     assert resp.json()["statut"] == "TERMINEE"
@@ -109,25 +109,25 @@ def test_finish_intervention(api_client, biomed_user, equipment, panne):
 
 @pytest.mark.django_db
 def test_cannot_finish_not_started(api_client, biomed_user, equipment, panne):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
         {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
-        content_type="application/json",
+        format="json",
     )
     intervention_id = create_resp.json()["id"]
-    resp = api_client.post(f"/api/interventions/{intervention_id}/finish/", {}, content_type="application/json")
+    resp = api_client.post(f"/api/interventions/{intervention_id}/finish/", {}, format="json")
     assert resp.status_code == 400
 
 
 @pytest.mark.django_db
 def test_list_interventions(api_client, biomed_user, equipment, panne):
-    api_client.force_login(biomed_user)
+    api_client.force_authenticate(user=biomed_user)
     api_client.post(
         "/api/interventions/",
         {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
-        content_type="application/json",
+        format="json",
     )
     resp = api_client.get("/api/interventions/")
     assert resp.status_code == 200
-    assert resp.json()["count"] == 1
+    assert len(resp.json()) == 1
