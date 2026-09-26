@@ -7,16 +7,17 @@ logger = logging.getLogger(__name__)
 
 
 class OfflineIdempotencyMiddleware(MiddlewareMixin):
-    """
-    Middleware d'idempotence pour les operations hors ligne.
+    """Middleware d'idempotence pour les opérations hors ligne.
 
-    Si la requete contient un header X-Offline-Id :
-    1. Verifie si cette operation a deja ete executee
-    2. Si oui, retourne la reponse cachee (idempotence)
-    3. Si non, execute la requete et stocke le resultat
-    """
+    Si la requête contient un header X-Offline-Id :
+    1. Vérifie si cette opération a déjà été exécutée (par cet utilisateur)
+    2. Si oui, retourne la réponse cachée (idempotence)
+    3. Si non, execute la requête et stocke le résultat
 
-    # Seules les methodes de mutation sont concernees
+    L'idempotence est isolée par utilisateur : deux utilisateurs peuvent
+    réutiliser le même X-Offline-Id sans conflit."""
+
+    # Seules les méthodes de mutation sont concernées
     MUTATION_METHODS = {"POST", "PATCH", "PUT", "DELETE"}
 
     def process_request(self, request):
@@ -27,31 +28,43 @@ class OfflineIdempotencyMiddleware(MiddlewareMixin):
         if request.method not in self.MUTATION_METHODS:
             return None
 
-        # Lazy import pour eviter les circulaires
+        # Parser le corps JSON une seule fois pour l'archiver avec l'opération
+        try:
+            request._parsed_body = json.loads(request.body.decode("utf-8")) if request.body else None
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            request._parsed_body = None
+
+        # Import lazy pour éviter les circulaires
         from apps.sync.models import OfflineOperation
 
-        try:
-            existing = OfflineOperation.objects.get(offline_id=offline_id)
-        except OfflineOperation.DoesNotExist:
-            # Premiere execution, stocker l'ID pour traitement
+        # Si l'utilisateur n'est pas encore résolu (JWT non décodé), on ne peut pas
+        # faire de vérification d'idempotence. On passe et on stockera en process_response.
+        if not request.user.is_authenticated:
             request._offline_id = offline_id
             return None
 
-        # Operation deja executee — retourner la reponse cachee
+        # Rechercher par (utilisateur, offline_id)
+        existing = OfflineOperation.objects.filter(
+            offline_id=offline_id,
+            user=request.user,
+        ).first()
+
+        if existing is None:
+            # Première exécution, stocker l'ID pour traitement
+            request._offline_id = offline_id
+            return None
+
+        # Opération déjà exécutée — retourner la réponse cachée
         if existing.statut == OfflineOperation.StatutExecution.OK:
-            logger.info(f"Offline idempotence: {offline_id} deja traite, retour cache")
+            logger.info(f"Idempotence offline : {offline_id} déjà traité, retour du cache")
             return JsonResponse(existing.response_body or {}, status=existing.response_status or 200)
 
-        if existing.statut == OfflineOperation.StatutExecution.ERREUR:
-            logger.info(f"Offline idempotence: {offline_id} en erreur, permettre le retry")
-            # Delete the old failed entry so this request proceeds as new
-            existing.delete()
-            request._offline_id = offline_id
-            return None
-
-        # Statut EN_COURS — operation probably stuck (process crashed). Allow retry.
-        logger.warning(f"Offline idempotence: {offline_id} en cours bloqué, autorise le retry")
-        existing.delete()
+        # Statut ERREUR ou EN_COURS bloqué — autoriser le retry SANS supprimer
+        # l'enregistrement : process_response le mettra à jour via update_or_create,
+        # ce qui conserve la trace (pas de suppression silencieuse du journal).
+        logger.warning(
+            f"Idempotence offline : {offline_id} en statut {existing.statut}, retry autorisé"
+        )
         request._offline_id = offline_id
         return None
 
@@ -80,9 +93,9 @@ class OfflineIdempotencyMiddleware(MiddlewareMixin):
         )
 
         OfflineOperation.objects.update_or_create(
+            user=request.user,
             offline_id=offline_id,
             defaults={
-                "user": request.user,
                 "method": request.method,
                 "url": request.path,
                 "body": getattr(request, "_parsed_body", None),

@@ -58,6 +58,17 @@ def retry_failed(request):
     ]
     count = failed.count()
 
+    # Trace d'audit avant suppression des opérations (RB-AUD-001)
+    from apps.audit.models import create_audit_log
+    create_audit_log(
+        utilisateur=request.user,
+        action="sync.retry_failed",
+        entite="OfflineOperation",
+        entite_id=request.user.id,
+        ancienne_valeur={"operations": operations},
+        nouvelle_valeur={"count": count},
+    )
+
     # Delete so the middleware won't block retries with the same X-Offline-Id
     failed.delete()
 
