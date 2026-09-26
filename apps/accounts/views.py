@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.models import create_audit_log
+from .scoping import scope_to_etablissement
 from .models import User, Etablissement, DemandeAcces, Notification
 from .permissions import CanManageUsers, IsActiveUser
 from .serializers import (
@@ -86,7 +87,12 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [CanManageUsers]
 
     def get_queryset(self):
-        return User.objects.select_related("etablissement").all()
+        # Cloisonnement : un admin ne gère que les utilisateurs de son établissement
+        return scope_to_etablissement(
+            User.objects.select_related("etablissement").all(),
+            self.request.user,
+            champ="etablissement",
+        )
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -96,6 +102,9 @@ class UserViewSet(viewsets.ModelViewSet):
         return UserSerializer
 
     def perform_create(self, serializer):
+        # Un admin ne peut créer un utilisateur que dans son propre établissement
+        if self.request.user.etablissement_id:
+            serializer.validated_data["etablissement"] = self.request.user.etablissement
         user = serializer.save()
         create_audit_log(
             utilisateur=self.request.user,
@@ -136,9 +145,9 @@ class UserViewSet(viewsets.ModelViewSet):
 @api_view(["POST"])
 @permission_classes([CanManageUsers])
 def deactivate_user_view(request, pk):
-    """Désactiver un utilisateur."""
+    """Désactiver un utilisateur (du même établissement)."""
     try:
-        target = User.objects.get(pk=pk)
+        target = scope_to_etablissement(User.objects.all(), request.user, champ="etablissement").get(pk=pk)
     except User.DoesNotExist:
         return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -164,9 +173,9 @@ def deactivate_user_view(request, pk):
 @api_view(["POST"])
 @permission_classes([CanManageUsers])
 def set_role_view(request, pk):
-    """Attribuer un rôle à un utilisateur."""
+    """Attribuer un rôle à un utilisateur (du même établissement)."""
     try:
-        target = User.objects.get(pk=pk)
+        target = scope_to_etablissement(User.objects.all(), request.user, champ="etablissement").get(pk=pk)
     except User.DoesNotExist:
         return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -219,8 +228,9 @@ def request_access_view(request):
     }, status=status.HTTP_201_CREATED)
 
 
-class DemandeAccesViewSet(viewsets.ModelViewSet):
-    """Gestion des demandes d'accès — admin only."""
+class DemandeAccesViewSet(viewsets.ReadOnlyModelViewSet):
+    """Consultation des demandes d'accès — admin only.
+    Les actions approve/reject sont des endpoints séparés."""
     queryset = DemandeAcces.objects.select_related("traite_par").all()
     serializer_class = DemandeAccesSerializer
     permission_classes = [CanManageUsers]
@@ -245,8 +255,19 @@ def approve_demande_view(request, pk):
     if demande.statut != DemandeAcces.Statut.EN_ATTENTE:
         return Response({"detail": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Établissement du nouvel utilisateur : celui de l'admin qui approuve.
+    # Un super-admin sans établissement peut en fournir un explicitement.
+    etablissement = None
+    if not request.user.etablissement_id:
+        etab_id = request.data.get("etablissement")
+        if etab_id:
+            try:
+                etablissement = Etablissement.objects.get(pk=etab_id, actif=True)
+            except (Etablissement.DoesNotExist, ValueError):
+                return Response({"detail": "Établissement invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        user = demande.approuver(request.user)
+        user, temp_password = demande.approuver(request.user, etablissement=etablissement)
     except Exception as e:
         return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -259,8 +280,11 @@ def approve_demande_view(request, pk):
     )
 
     return Response({
-        "detail": f"Demande approuvée. Utilisateur {user.username} créé.",
+        "detail": f"Demande approuvée. Utilisateur {user.username} créé. "
+                  "Communiquez le mot de passe temporaire à l'utilisateur par un canal sûr.",
         "user": UserSerializer(user).data,
+        # Transmis à l'administrateur uniquement, jamais persisté en base
+        "temp_password": temp_password,
     })
 
 
@@ -322,6 +346,13 @@ def notification_read_view(request, pk):
 def notifications_read_all_view(request):
     """Marquer toutes les notifications comme lues."""
     count = request.user.notifications.filter(lu=False).update(lu=True)
+    create_audit_log(
+        utilisateur=request.user,
+        action="notification.read_all",
+        entite="Notification",
+        entite_id=request.user.id,
+        nouvelle_valeur={"count": count},
+    )
     return Response({"detail": f"{count} notification(s) marquée(s) comme lue(s)."})
 
 
@@ -347,10 +378,9 @@ def complete_profile_view(request):
     serializer.is_valid(raise_exception=True)
 
     request.user.matricule = serializer.validated_data["matricule"]
-    request.user.etablissement = serializer.validated_data["etablissement"]
     request.user.set_password(serializer.validated_data["new_password"])
     request.user.profil_complete = True
-    request.user.save(update_fields=["matricule", "etablissement", "profil_complete"])
+    request.user.save(update_fields=["matricule", "profil_complete", "password"])
 
     create_audit_log(
         utilisateur=request.user,

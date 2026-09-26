@@ -51,15 +51,17 @@ def _login(client, username, password):
     return resp.json()["access"]
 
 
-def _get_temp_password(user):
-    """Extract the temporary password from the user's notification."""
-    notif = user.notifications.order_by("-date_creation").first()
-    assert notif, f"Aucune notification pour {user.username}"
-    # Message format: ...Mot de passe temporaire : <password>\n\n...
-    for line in notif.message.split("\n"):
-        if line.startswith("Mot de passe temporaire :"):
-            return line.split(":", 1)[1].strip()
-    pytest.fail(f"Mot de passe temporaire introuvable dans : {notif.message}")
+def _approve_demande(api_client, demande):
+    """Approuve la demande et retourne le mot de passe temporaire.
+
+    Le mot de passe n'est transmis que dans la réponse API destinée à
+    l'administrateur — jamais persisté (notification, base)."""
+    token = _login(api_client, "admin_demande", "Admin123!")
+    resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+    assert resp.status_code == 200
+    password = resp.json().get("temp_password")
+    assert password, "La réponse d'approbation doit contenir temp_password"
+    return password
 
 
 # ======================== Request Access ========================
@@ -268,29 +270,28 @@ class TestNotifications:
             "justification": "Test",
         }, content_type="application/json")
         demande = DemandeAcces.objects.get(email=email)
-        token = _login(api_client, "admin_demande", "Admin123!")
-        api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
-        return User.objects.get(email=email)
+        password = _approve_demande(api_client, demande)
+        return User.objects.get(email=email), password
 
     def test_user_can_list_notifications(self, api_client, admin_user):
-        user = self._create_approved_user(api_client, admin_user)
-        token = _login(api_client, user.username, _get_temp_password(user))
+        user, password = self._create_approved_user(api_client, admin_user)
+        token = _login(api_client, user.username, password)
         resp = api_client.get("/api/notifications/", HTTP_AUTHORIZATION=f"Bearer {token}")
         assert resp.status_code == 200
         assert resp.json()["non_lues"] >= 1
 
     def test_user_can_mark_notification_read(self, api_client, admin_user):
-        user = self._create_approved_user(api_client, admin_user)
+        user, password = self._create_approved_user(api_client, admin_user)
         notif = user.notifications.first()
-        token = _login(api_client, user.username, _get_temp_password(user))
+        token = _login(api_client, user.username, password)
         resp = api_client.post(f"/api/notifications/{notif.id}/read/", HTTP_AUTHORIZATION=f"Bearer {token}")
         assert resp.status_code == 200
         notif.refresh_from_db()
         assert notif.lu is True
 
     def test_user_can_mark_all_read(self, api_client, admin_user):
-        user = self._create_approved_user(api_client, admin_user)
-        token = _login(api_client, user.username, _get_temp_password(user))
+        user, password = self._create_approved_user(api_client, admin_user)
+        token = _login(api_client, user.username, password)
         resp = api_client.post("/api/notifications/read-all/", HTTP_AUTHORIZATION=f"Bearer {token}")
         assert resp.status_code == 200
         assert user.notifications.filter(lu=False).count() == 0
@@ -315,7 +316,6 @@ class TestProfileCompletion:
         token = _login(api_client, "admin_demande", "Admin123!")
         resp = api_client.post("/api/auth/complete-profile/", {
             "matricule": "MAT-001",
-            "etablissement": etab.id,
             "service": "Cardiologie",
             "new_password": "NouveauMot2024!",
         }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
@@ -330,7 +330,6 @@ class TestProfileCompletion:
         token = _login(api_client, "admin_demande", "Admin123!")
         resp = api_client.post("/api/auth/complete-profile/", {
             "matricule": "MAT-002",
-            "etablissement": etab.id,
             "new_password": "NouveauMot2024!",
         }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
         assert resp.status_code == 400
@@ -338,24 +337,26 @@ class TestProfileCompletion:
     def test_complete_profile_missing_matricule(self, api_client, admin_user, etab):
         token = _login(api_client, "admin_demande", "Admin123!")
         resp = api_client.post("/api/auth/complete-profile/", {
-            "etablissement": etab.id,
             "new_password": "NouveauMot2024!",
         }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
         assert resp.status_code == 400
 
-    def test_complete_profile_invalid_etablissement(self, api_client, admin_user):
+    def test_complete_profile_ignore_etablissement_payload(self, api_client, admin_user, etab):
+        """Un champ etablissement dans la payload n'a aucun effet (cloisonnement)."""
+        autre_etab = Etablissement.objects.create(nom="Autre Hôpital")
         token = _login(api_client, "admin_demande", "Admin123!")
         resp = api_client.post("/api/auth/complete-profile/", {
             "matricule": "MAT-003",
-            "etablissement": 99999,
+            "etablissement": autre_etab.id,
             "new_password": "NouveauMot2024!",
         }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
-        assert resp.status_code == 400
+        assert resp.status_code == 200
+        admin_user.refresh_from_db()
+        assert admin_user.etablissement == etab  # inchangé
 
     def test_unauthenticated_cannot_complete_profile(self, api_client, etab):
         resp = api_client.post("/api/auth/complete-profile/", {
             "matricule": "MAT-004",
-            "etablissement": etab.id,
             "new_password": "NouveauMot2024!",
         }, content_type="application/json")
         assert resp.status_code == 401
@@ -411,8 +412,13 @@ class TestFullWorkflowE2E:
         # 3. Notification créée
         assert Notification.objects.filter(destinataire=user, titre__contains="approuvée").exists()
 
-        # 4. User se connecte
-        token_user = _login(api_client, "marie", _get_temp_password(user))
+        # 3b. La notification ne contient jamais le mot de passe en clair
+        notif = Notification.objects.get(destinataire=user, titre__contains="approuvée")
+        assert "temp_password" not in notif.message
+        assert "Mot de passe temporaire :" not in notif.message
+
+        # 4. User se connecte (mot de passe communiqué via la réponse API admin)
+        token_user = _login(api_client, "marie", resp.json()["temp_password"])
         resp = api_client.get("/api/auth/me/", HTTP_AUTHORIZATION=f"Bearer {token_user}")
         assert resp.status_code == 200
         assert resp.json()["profil_complete"] is False

@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Q
 from apps.failures.models import Panne
+from apps.accounts.scoping import scope_to_etablissement
 
 
 class WorkQueueView(APIView):
@@ -13,7 +14,7 @@ class WorkQueueView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        pannes_ouvertes = Panne.objects.filter(
+        pannes_ouvertes = scope_to_etablissement(Panne.objects.all(), request.user).filter(
             statut__in=[
                 Panne.Statut.SIGNALEE,
                 Panne.Statut.QUALIFIEE,

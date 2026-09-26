@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r"equipment", views.EquipmentViewSet)
+router.register(r"equipment", views.EquipmentViewSet, basename="equipment")
 router.register(r"services", views.ServiceViewSet)
 router.register(r"locations", views.LocalisationViewSet)
 

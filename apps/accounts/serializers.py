@@ -138,9 +138,10 @@ class NotificationSerializer(serializers.ModelSerializer):
 # --- Complétion profil ---
 
 class CompleteProfileSerializer(serializers.Serializer):
+    # L'établissement n'est PAS ici : il est attribué par l'administrateur
+    # lors de l'approbation (cloisonnement multi-établissements).
     matricule = serializers.CharField(max_length=50)
     service = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    etablissement = serializers.PrimaryKeyRelatedField(queryset=Etablissement.objects.filter(actif=True))
     new_password = serializers.CharField(min_length=8, write_only=True)
 
     def validate_matricule(self, value):

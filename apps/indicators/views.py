@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Avg, Count, F, ExpressionWrapper, DurationField
 from apps.equipment.models import Equipment
 from apps.failures.models import Panne
+from apps.accounts.scoping import scope_to_etablissement
 
 
 class IndicateursView(APIView):
@@ -15,7 +16,7 @@ class IndicateursView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        equipements = Equipment.objects.filter(
+        equipements = scope_to_etablissement(Equipment.objects.all(), request.user, champ="etablissement").filter(
             etat_operationnel__in=[
                 Equipment.StatutOperationnel.FONCTIONNEL,
                 Equipment.StatutOperationnel.FONCTIONNEL_SOUS_SURVEILLANCE,

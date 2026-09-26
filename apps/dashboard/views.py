@@ -5,6 +5,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
 from apps.equipment.models import Equipment
+from apps.accounts.scoping import scope_to_etablissement
 from apps.failures.models import Panne
 from apps.preventive.models import MaintenancePreventive
 
@@ -18,13 +19,13 @@ class DashboardView(APIView):
         thirty_days_ago = now - timedelta(days=30)
 
         # Compteurs équipements
-        equipements = Equipment.objects.all()
+        equipements = scope_to_etablissement(Equipment.objects.all(), request.user, champ="etablissement")
         eq_total = equipements.count()
         eq_fonctionnels = equipements.filter(etat_operationnel=Equipment.StatutOperationnel.FONCTIONNEL).count()
         eq_pannees = equipements.filter(etat_operationnel=Equipment.StatutOperationnel.EN_PANNE).count()
 
         # Pannes ouvertes
-        pannes_ouvertes = Panne.objects.filter(
+        pannes_ouvertes = scope_to_etablissement(Panne.objects.all(), request.user).filter(
             statut__in=[
                 Panne.Statut.SIGNALEE,
                 Panne.Statut.QUALIFIEE,
@@ -38,16 +39,16 @@ class DashboardView(APIView):
         )
 
         # Pannes des 30 derniers jours
-        pannes_30j = Panne.objects.filter(date_signalement__gte=thirty_days_ago).count()
+        pannes_30j = scope_to_etablissement(Panne.objects.all(), request.user).filter(date_signalement__gte=thirty_days_ago).count()
 
         # Maintenances préventives en retard
-        maintenances_retard = MaintenancePreventive.objects.filter(
+        maintenances_retard = scope_to_etablissement(MaintenancePreventive.objects.all(), request.user).filter(
             statut=MaintenancePreventive.Statut.EN_RETARD
         ).count()
 
         # Maintenances à venir (7 prochains jours)
         in_seven_days = now.date() + timedelta(days=7)
-        maintenances_7j = MaintenancePreventive.objects.filter(
+        maintenances_7j = scope_to_etablissement(MaintenancePreventive.objects.all(), request.user).filter(
             statut=MaintenancePreventive.Statut.PLANIFIEE,
             date_planifiee__lte=in_seven_days,
         ).count()

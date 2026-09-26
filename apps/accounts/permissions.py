@@ -100,3 +100,41 @@ class CanReportFailure(BasePermission):
             User.Role.TECHNICIEN,
             User.Role.PERSONNEL_SOIGNANT,
         )
+
+
+class CanEvaluateCriticite(BasePermission):
+    """RB-SEC-005 : Responsable peut évaluer la criticité."""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_active and request.user.role in (
+            User.Role.ADMINISTRATEUR,
+            User.Role.RESPONSABLE_BIOMEDICAL,
+        )
+
+
+class CanStartIntervention(BasePermission):
+    """RB-SEC-006 : Technicien peut démarrer une intervention."""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_active and request.user.role in (
+            User.Role.ADMINISTRATEUR,
+            User.Role.RESPONSABLE_BIOMEDICAL,
+            User.Role.TECHNICIEN,
+        )
+
+
+class CanManageWaitState(BasePermission):
+    """RB-SEC-007 : Responsable peut mettre en attente (pièce/prestataire)."""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_active and request.user.role in (
+            User.Role.ADMINISTRATEUR,
+            User.Role.RESPONSABLE_BIOMEDICAL,
+        )
+
+
+class CanStartTest(BasePermission):
+    """RB-SEC-008 : Technicien peut lancer un test."""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_active and request.user.role in (
+            User.Role.ADMINISTRATEUR,
+            User.Role.RESPONSABLE_BIOMEDICAL,
+            User.Role.TECHNICIEN,
+        )

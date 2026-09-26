@@ -119,12 +119,19 @@ class DemandeAcces(models.Model):
     def __str__(self):
         return f"{self.nom_complet} — {self.get_statut_display()}"
 
-    def approuver(self, admin_user):
-        """Approuve la demande et crée l'utilisateur."""
-        from django.contrib.auth.hashers import make_password
+    def approuver(self, admin_user, etablissement=None):
+        """Approuve la demande et crée l'utilisateur.
 
+        L'établissement du nouvel utilisateur est celui de l'administrateur
+        qui approuve (ou `etablissement` explicitement fourni par un
+        super-admin sans établissement). Jamais de choix libre.
+
+        Retourne (user, temp_password) : le mot de passe temporaire ne doit
+        être communiqué qu'à l'administrateur (réponse API), jamais persisté."""
         if self.statut != self.Statut.EN_ATTENTE:
             raise ValueError("Cette demande a déjà été traitée.")
+
+        etab = etablissement or admin_user.etablissement
 
         # Créer l'utilisateur avec un mot de passe temporaire
         username = self.email.split("@")[0]
@@ -141,6 +148,7 @@ class DemandeAcces(models.Model):
             first_name=self.nom_complet.split()[0] if self.nom_complet.split() else "",
             last_name=" ".join(self.nom_complet.split()[1:]) if len(self.nom_complet.split()) > 1 else "",
             role=self.role_souhaite,
+            etablissement=etab,
             is_active=True,
             profil_complete=False,
         )
@@ -154,20 +162,21 @@ class DemandeAcces(models.Model):
         self.date_traitement = timezone.now()
         self.save(update_fields=["statut", "traite_par", "date_traitement"])
 
-        # Créer notification pour l'utilisateur
+        # Créer notification pour l'utilisateur — sans le mot de passe
+        # (un identifiant de connexion n'est jamais persisté en clair en base)
         Notification.objects.create(
             destinataire=user,
             titre="Demande d'accès approuvée",
             message=(
                 f"Votre demande d'accès a été approuvée.\n"
-                f"Identifiant : {username}\n"
-                f"Mot de passe temporaire : {temp_password}\n\n"
-                f"Vous devez changer votre mot de passe après connexion."
+                f"Identifiant : {username}\n\n"
+                f"Votre mot de passe temporaire vous sera communiqué par "
+                f"l'administrateur. Vous devez le changer après connexion."
             ),
             lien="/complete-profile",
         )
 
-        return user
+        return user, temp_password
 
     def rejeter(self, admin_user, motif=""):
         """Rejette la demande."""
