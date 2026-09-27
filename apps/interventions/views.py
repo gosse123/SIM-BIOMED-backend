@@ -26,8 +26,12 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     detail_serializer_class = InterventionDetailSerializer
 
     def get_queryset(self):
+        # File d'interventions priorisée (RB-PR-004) : criticité de la panne
+        # liée d'abord (CRITIQUE en tête, alphabétique), puis plus récentes.
+        from django.db.models import F
         return scope_to_etablissement(
-            Intervention.objects.select_related("equipement", "panne", "realisee_par").all(),
+            Intervention.objects.select_related("equipement", "panne", "realisee_par")
+            .order_by(F("panne__niveau_criticite").asc(nulls_last=True), "-created_at"),
             self.request.user,
         )
 
@@ -43,7 +47,23 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
         return InterventionDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(realisee_par=self.request.user)
+        # Champ métier hors modèle : hors-service total à la prise en charge
+        hors_service_total = serializer.validated_data.pop("hors_service_total", False)
+        intervention = serializer.save(realisee_par=self.request.user)
+        if hors_service_total:
+            equipement = intervention.equipement
+            ancien_etat = equipement.etat_operationnel
+            equipement.etat_operationnel = equipement.StatutOperationnel.HORS_SERVICE
+            equipement.save(update_fields=["etat_operationnel"])
+            create_audit_log(
+                utilisateur=self.request.user,
+                action="equipment.hors_service",
+                entite="Equipment",
+                entite_id=equipement.id,
+                ancienne_valeur={"etat_operationnel": ancien_etat},
+                nouvelle_valeur={"etat_operationnel": equipement.etat_operationnel,
+                                 "intervention_id": intervention.id},
+            )
 
     def get_audit_nouvelle_valeur(self, intervention):
         return {
@@ -97,6 +117,8 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
         serializer = FinishInterventionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        repare_totalement = serializer.validated_data.get("repare_totalement", False)
+
         ancien_statut = intervention.statut
         intervention.statut = Intervention.StatutIntervention.TERMINEE
         intervention.date_fin = timezone.now()
@@ -111,4 +133,22 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
             ancienne_valeur={"statut": ancien_statut},
             nouvelle_valeur={"statut": intervention.statut},
         )
+
+        # RB-CL-002 : réparation totale → remise FONCTIONNEL de l'équipement.
+        # La panne liée n'est PAS clôturée ici : elle exige un test (RB-CL-001).
+        if repare_totalement:
+            equipement = intervention.equipement
+            ancien_etat = equipement.etat_operationnel
+            equipement.etat_operationnel = equipement.StatutOperationnel.FONCTIONNEL
+            equipement.save(update_fields=["etat_operationnel"])
+            create_audit_log(
+                utilisateur=request.user,
+                action="equipment.remise_en_service",
+                entite="Equipment",
+                entite_id=equipement.id,
+                ancienne_valeur={"etat_operationnel": ancien_etat},
+                nouvelle_valeur={"etat_operationnel": equipement.etat_operationnel,
+                                 "intervention_id": intervention.id},
+            )
+
         return Response(InterventionDetailSerializer(intervention).data)
