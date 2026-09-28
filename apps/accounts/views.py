@@ -5,23 +5,24 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.models import create_audit_log
+
+from .models import DemandeAcces, Etablissement, Notification, User
+from .permissions import CanManageUsers
 from .scoping import scope_to_etablissement
-from .models import User, Etablissement, DemandeAcces, Notification
-from .permissions import CanManageUsers, IsActiveUser
 from .serializers import (
-    LoginSerializer,
-    UserSerializer,
-    UserCreateSerializer,
-    UserUpdateSerializer,
-    SetRoleSerializer,
-    RegisterSerializer,
     ChangePasswordSerializer,
-    EtablissementSerializer,
+    CompleteProfileSerializer,
     DemandeAccesCreateSerializer,
     DemandeAccesSerializer,
-    RejectDemandeSerializer,
+    EtablissementSerializer,
+    LoginSerializer,
     NotificationSerializer,
-    CompleteProfileSerializer,
+    RegisterSerializer,
+    RejectDemandeSerializer,
+    SetRoleSerializer,
+    UserCreateSerializer,
+    UserSerializer,
+    UserUpdateSerializer,
 )
 
 
@@ -36,11 +37,13 @@ def login_view(request):
     refresh = RefreshToken.for_user(user)
     refresh["role"] = user.role
 
-    return Response({
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "user": UserSerializer(user).data,
-    })
+    return Response(
+        {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        }
+    )
 
 
 @api_view(["POST"])
@@ -54,11 +57,14 @@ def register_view(request):
     refresh = RefreshToken.for_user(user)
     refresh["role"] = user.role
 
-    return Response({
-        "access": str(refresh.access_token),
-        "refresh": str(refresh),
-        "user": UserSerializer(user).data,
-    }, status=status.HTTP_201_CREATED)
+    return Response(
+        {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["GET"])
@@ -81,8 +87,10 @@ def change_password_view(request):
 
 # --- User Management (Admin only) ---
 
+
 class UserViewSet(viewsets.ModelViewSet):
     """CRUD Utilisateurs — admin only."""
+
     queryset = User.objects.select_related("etablissement").all()
     permission_classes = [CanManageUsers]
 
@@ -147,12 +155,17 @@ class UserViewSet(viewsets.ModelViewSet):
 def deactivate_user_view(request, pk):
     """Désactiver un utilisateur (du même établissement)."""
     try:
-        target = scope_to_etablissement(User.objects.all(), request.user, champ="etablissement").get(pk=pk)
+        target = scope_to_etablissement(
+            User.objects.all(), request.user, champ="etablissement"
+        ).get(pk=pk)
     except User.DoesNotExist:
         return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     if target == request.user:
-        return Response({"detail": "Vous ne pouvez pas vous désactiver vous-même."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Vous ne pouvez pas vous désactiver vous-même."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     old_active = target.is_active
     target.is_active = False
@@ -175,12 +188,17 @@ def deactivate_user_view(request, pk):
 def set_role_view(request, pk):
     """Attribuer un rôle à un utilisateur (du même établissement)."""
     try:
-        target = scope_to_etablissement(User.objects.all(), request.user, champ="etablissement").get(pk=pk)
+        target = scope_to_etablissement(
+            User.objects.all(), request.user, champ="etablissement"
+        ).get(pk=pk)
     except User.DoesNotExist:
         return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     if target == request.user:
-        return Response({"detail": "Vous ne pouvez pas modifier votre propre rôle."}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {"detail": "Vous ne pouvez pas modifier votre propre rôle."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     serializer = SetRoleSerializer(data=request.data, context={"request": request})
     serializer.is_valid(raise_exception=True)
@@ -203,6 +221,7 @@ def set_role_view(request, pk):
 
 # --- Établissement ---
 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def etablissement_courant_view(request):
@@ -214,6 +233,7 @@ def etablissement_courant_view(request):
 
 # --- Demande d'accès ---
 
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def request_access_view(request):
@@ -222,15 +242,21 @@ def request_access_view(request):
     serializer.is_valid(raise_exception=True)
     demande = serializer.save()
 
-    return Response({
-        "detail": "Votre demande d'accès a été envoyée. Vous recevrez une réponse prochainement.",
-        "id": demande.id,
-    }, status=status.HTTP_201_CREATED)
+    return Response(
+        {
+            "detail": (
+                "Votre demande d'accès a été envoyée. Vous recevrez une réponse prochainement."
+            ),
+            "id": demande.id,
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 class DemandeAccesViewSet(viewsets.ReadOnlyModelViewSet):
     """Consultation des demandes d'accès — admin only.
     Les actions approve/reject sont des endpoints séparés."""
+
     queryset = DemandeAcces.objects.select_related("traite_par").all()
     serializer_class = DemandeAccesSerializer
     permission_classes = [CanManageUsers]
@@ -253,7 +279,9 @@ def approve_demande_view(request, pk):
         return Response({"detail": "Demande introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     if demande.statut != DemandeAcces.Statut.EN_ATTENTE:
-        return Response({"detail": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     # Établissement du nouvel utilisateur : celui de l'admin qui approuve.
     # Un super-admin sans établissement peut en fournir un explicitement.
@@ -264,7 +292,9 @@ def approve_demande_view(request, pk):
             try:
                 etablissement = Etablissement.objects.get(pk=etab_id, actif=True)
             except (Etablissement.DoesNotExist, ValueError):
-                return Response({"detail": "Établissement invalide."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"detail": "Établissement invalide."}, status=status.HTTP_400_BAD_REQUEST
+                )
 
     try:
         user, temp_password = demande.approuver(request.user, etablissement=etablissement)
@@ -279,13 +309,15 @@ def approve_demande_view(request, pk):
         nouvelle_valeur={"statut": "APPROUVEE", "user_created": user.username},
     )
 
-    return Response({
-        "detail": f"Demande approuvée. Utilisateur {user.username} créé. "
-                  "Communiquez le mot de passe temporaire à l'utilisateur par un canal sûr.",
-        "user": UserSerializer(user).data,
-        # Transmis à l'administrateur uniquement, jamais persisté en base
-        "temp_password": temp_password,
-    })
+    return Response(
+        {
+            "detail": f"Demande approuvée. Utilisateur {user.username} créé. "
+            "Communiquez le mot de passe temporaire à l'utilisateur par un canal sûr.",
+            "user": UserSerializer(user).data,
+            # Transmis à l'administrateur uniquement, jamais persisté en base
+            "temp_password": temp_password,
+        }
+    )
 
 
 @api_view(["POST"])
@@ -298,7 +330,9 @@ def reject_demande_view(request, pk):
         return Response({"detail": "Demande introuvable."}, status=status.HTTP_404_NOT_FOUND)
 
     if demande.statut != DemandeAcces.Statut.EN_ATTENTE:
-        return Response({"detail": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Cette demande a déjà été traitée."}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     serializer = RejectDemandeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -317,6 +351,7 @@ def reject_demande_view(request, pk):
 
 
 # --- Notifications ---
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -358,13 +393,16 @@ def notifications_read_all_view(request):
 
 # --- Complétion profil ---
 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def profile_complete_view(request):
     """Vérifier si le profil est complet."""
-    return Response({
-        "profil_complete": request.user.profil_complete,
-    })
+    return Response(
+        {
+            "profil_complete": request.user.profil_complete,
+        }
+    )
 
 
 @api_view(["POST"])
@@ -372,7 +410,9 @@ def profile_complete_view(request):
 def complete_profile_view(request):
     """Compléter le profil après première connexion."""
     if request.user.profil_complete:
-        return Response({"detail": "Votre profil est déjà complet."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"detail": "Votre profil est déjà complet."}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     serializer = CompleteProfileSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -390,13 +430,16 @@ def complete_profile_view(request):
         nouvelle_valeur={"profil_complete": True, "matricule": request.user.matricule},
     )
 
-    return Response({
-        "detail": "Profil complété avec succès.",
-        "user": UserSerializer(request.user).data,
-    })
+    return Response(
+        {
+            "detail": "Profil complété avec succès.",
+            "user": UserSerializer(request.user).data,
+        }
+    )
 
 
 # --- Listes utilitaires ---
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

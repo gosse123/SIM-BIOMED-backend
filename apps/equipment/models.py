@@ -3,6 +3,7 @@ from django.db import models
 
 class Service(models.Model):
     """Service hospitalier (RB-EQ-002)."""
+
     nom = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     etablissement = models.ForeignKey(
@@ -25,6 +26,7 @@ class Service(models.Model):
 
 class Localisation(models.Model):
     """Localisation physique de l'équipement (RB-EQ-002)."""
+
     batiment = models.CharField(max_length=200)
     etage = models.CharField(max_length=50, blank=True)
     salle = models.CharField(max_length=100)
@@ -55,10 +57,16 @@ class Equipment(models.Model):
 
     class StatutOperationnel(models.TextChoices):
         FONCTIONNEL = "FONCTIONNEL", "Fonctionnel"
-        FONCTIONNEL_SOUS_SURVEILLANCE = "FONCTIONNEL_SOUS_SURVEILLANCE", "Fonctionnel sous surveillance"
+        FONCTIONNEL_SOUS_SURVEILLANCE = (
+            "FONCTIONNEL_SOUS_SURVEILLANCE",
+            "Fonctionnel sous surveillance",
+        )
         EN_PANNE = "EN_PANNE", "En panne"
         EN_MAINTENANCE = "EN_MAINTENANCE", "En maintenance"
-        EN_ATTENTE_PIECE_OU_PRESTATAIRE = "EN_ATTENTE_PIECE_OU_PRESTATAIRE", "En attente de pièce ou prestataire"
+        EN_ATTENTE_PIECE_OU_PRESTATAIRE = (
+            "EN_ATTENTE_PIECE_OU_PRESTATAIRE",
+            "En attente de pièce ou prestataire",
+        )
         HORS_SERVICE = "HORS_SERVICE", "Hors service"
         REFORME = "REFORME", "Réformé"
 
@@ -77,7 +85,9 @@ class Equipment(models.Model):
         REFORME = "REFORME", "Réformé"
 
     # RB-EQ-001 : Identifiant unique
-    num_inventaire = models.CharField(max_length=50, unique=True, verbose_name="Numéro d'inventaire")
+    num_inventaire = models.CharField(
+        max_length=50, unique=True, verbose_name="Numéro d'inventaire"
+    )
 
     # RB-EQ-002 : Identification
     nom = models.CharField(max_length=300)
@@ -89,7 +99,9 @@ class Equipment(models.Model):
 
     # Relations
     service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="equipements")
-    localisation = models.ForeignKey(Localisation, on_delete=models.PROTECT, related_name="equipements")
+    localisation = models.ForeignKey(
+        Localisation, on_delete=models.PROTECT, related_name="equipements"
+    )
     etablissement = models.ForeignKey(
         "accounts.Etablissement",
         on_delete=models.PROTECT,

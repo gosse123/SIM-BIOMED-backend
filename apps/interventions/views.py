@@ -1,24 +1,27 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from apps.accounts.permissions import CanManageEquipment
-from apps.audit.models import create_audit_log
-from apps.audit.mixins import AuditedCreateMixin
 from apps.accounts.scoping import scope_to_etablissement
+from apps.audit.mixins import AuditedCreateMixin
+from apps.audit.models import create_audit_log
+
 from .models import Intervention
 from .serializers import (
-    InterventionListSerializer,
-    InterventionDetailSerializer,
     CreateInterventionSerializer,
-    StartInterventionSerializer,
     FinishInterventionSerializer,
+    InterventionDetailSerializer,
+    InterventionListSerializer,
+    StartInterventionSerializer,
 )
 
 
 class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     """CRUD interventions avec transitions de statut et audit (RB-AUD-001)."""
+
     queryset = Intervention.objects.select_related("equipement", "panne", "realisee_par").all()
     permission_classes = [IsAuthenticated, CanManageEquipment]
     audit_create_action = "intervention.create"
@@ -29,9 +32,11 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
         # File d'interventions priorisée (RB-PR-004) : criticité de la panne
         # liée d'abord (CRITIQUE en tête, alphabétique), puis plus récentes.
         from django.db.models import F
+
         return scope_to_etablissement(
-            Intervention.objects.select_related("equipement", "panne", "realisee_par")
-            .order_by(F("panne__niveau_criticite").asc(nulls_last=True), "-created_at"),
+            Intervention.objects.select_related("equipement", "panne", "realisee_par").order_by(
+                F("panne__niveau_criticite").asc(nulls_last=True), "-created_at"
+            ),
             self.request.user,
         )
 
@@ -61,8 +66,10 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
                 entite="Equipment",
                 entite_id=equipement.id,
                 ancienne_valeur={"etat_operationnel": ancien_etat},
-                nouvelle_valeur={"etat_operationnel": equipement.etat_operationnel,
-                                 "intervention_id": intervention.id},
+                nouvelle_valeur={
+                    "etat_operationnel": equipement.etat_operationnel,
+                    "intervention_id": intervention.id,
+                },
             )
 
     def get_audit_nouvelle_valeur(self, intervention):
@@ -76,9 +83,13 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     def start(self, request, pk=None):
         """Démarrer une intervention — PLANIFIEE → EN_COURS."""
         try:
-            intervention = scope_to_etablissement(Intervention.objects.all(), request.user).get(pk=pk)
+            intervention = scope_to_etablissement(Intervention.objects.all(), request.user).get(
+                pk=pk
+            )
         except Intervention.DoesNotExist:
-            return Response({"detail": "Intervention introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Intervention introuvable."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         if intervention.statut != Intervention.StatutIntervention.PLANIFIEE:
             return Response(
@@ -104,9 +115,13 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     def finish(self, request, pk=None):
         """Terminer une intervention — EN_COURS → TERMINEE."""
         try:
-            intervention = scope_to_etablissement(Intervention.objects.all(), request.user).get(pk=pk)
+            intervention = scope_to_etablissement(Intervention.objects.all(), request.user).get(
+                pk=pk
+            )
         except Intervention.DoesNotExist:
-            return Response({"detail": "Intervention introuvable."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Intervention introuvable."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         if intervention.statut != Intervention.StatutIntervention.EN_COURS:
             return Response(
@@ -147,8 +162,10 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
                 entite="Equipment",
                 entite_id=equipement.id,
                 ancienne_valeur={"etat_operationnel": ancien_etat},
-                nouvelle_valeur={"etat_operationnel": equipement.etat_operationnel,
-                                 "intervention_id": intervention.id},
+                nouvelle_valeur={
+                    "etat_operationnel": equipement.etat_operationnel,
+                    "intervention_id": intervention.id,
+                },
             )
 
         return Response(InterventionDetailSerializer(intervention).data)

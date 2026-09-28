@@ -1,5 +1,6 @@
-from django.db import models
 from django.core.exceptions import ValidationError
+from django.db import models
+
 from apps.accounts.models import User
 from apps.equipment.models import Equipment
 
@@ -53,18 +54,12 @@ class Panne(models.Model):
     }
 
     # Équipement
-    equipement = models.ForeignKey(
-        Equipment, on_delete=models.PROTECT, related_name="pannes"
-    )
+    equipement = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name="pannes")
 
     # Signalement
     date_signalement = models.DateTimeField(auto_now_add=True)
-    signale_par = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="pannes_signalees"
-    )
-    description_signalement = models.TextField(
-        verbose_name="Description initiale de la panne"
-    )
+    signale_par = models.ForeignKey(User, on_delete=models.PROTECT, related_name="pannes_signalees")
+    description_signalement = models.TextField(verbose_name="Description initiale de la panne")
 
     # Qualification (RB-PANNE-001 : pas de clôture sans qualification)
     date_qualification = models.DateTimeField(null=True, blank=True)
@@ -134,7 +129,8 @@ class Panne(models.Model):
                 if self.statut not in self.TRANSITIONS_VALIDES.get(old.statut, []):
                     raise ValidationError(
                         f"Transition invalide : {old.statut} → {self.statut}. "
-                        f"Transitions autorisees : {[t.value for t in self.TRANSITIONS_VALIDES[old.statut]]}"
+                        "Transitions autorisees : "
+                        f"{[t.value for t in self.TRANSITIONS_VALIDES[old.statut]]}"
                     )
 
     def save(self, *args, **kwargs):

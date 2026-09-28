@@ -9,3 +9,7 @@ select = ["E", "F", "I", "N", "UP"]
 DJANGO_SETTINGS_MODULE = "config.settings.development"
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations générées par Django : non réformatées à la main
+"apps/**/migrations/*" = ["E501"]

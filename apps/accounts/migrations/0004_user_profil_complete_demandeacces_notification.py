@@ -6,53 +6,118 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0003_default_establishment'),
+        ("accounts", "0003_default_establishment"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='profil_complete',
-            field=models.BooleanField(default=False, help_text="Indique si l'utilisateur a complété son profil après première connexion.", verbose_name='Profil complété'),
+            model_name="user",
+            name="profil_complete",
+            field=models.BooleanField(
+                default=False,
+                help_text="Indique si l'utilisateur a complété son profil après première connexion.",
+                verbose_name="Profil complété",
+            ),
         ),
         migrations.CreateModel(
-            name='DemandeAcces',
+            name="DemandeAcces",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nom_complet', models.CharField(max_length=200, verbose_name='Nom complet')),
-                ('email', models.EmailField(max_length=254, unique=True, verbose_name='Email professionnel')),
-                ('role_souhaite', models.CharField(choices=[('TECHNICIEN', 'Technicien biomédical'), ('PERSONNEL_SOIGNANT', 'Personnel soignant'), ('DIRECTION', 'Direction')], max_length=30, verbose_name='Rôle souhaité')),
-                ('justification', models.TextField(verbose_name='Justification de la demande')),
-                ('service', models.CharField(blank=True, max_length=200, verbose_name="Service d'affectation")),
-                ('statut', models.CharField(choices=[('EN_ATTENTE', 'En attente'), ('APPROUVEE', 'Approuvée'), ('REFUSEE', 'Refusée')], default='EN_ATTENTE', max_length=20)),
-                ('motif_rejet', models.TextField(blank=True, verbose_name='Motif du rejet')),
-                ('date_creation', models.DateTimeField(auto_now_add=True)),
-                ('date_traitement', models.DateTimeField(blank=True, null=True)),
-                ('traite_par', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='demandes_traitees', to=settings.AUTH_USER_MODEL, verbose_name='Traité par')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("nom_complet", models.CharField(max_length=200, verbose_name="Nom complet")),
+                (
+                    "email",
+                    models.EmailField(
+                        max_length=254, unique=True, verbose_name="Email professionnel"
+                    ),
+                ),
+                (
+                    "role_souhaite",
+                    models.CharField(
+                        choices=[
+                            ("TECHNICIEN", "Technicien biomédical"),
+                            ("PERSONNEL_SOIGNANT", "Personnel soignant"),
+                            ("DIRECTION", "Direction"),
+                        ],
+                        max_length=30,
+                        verbose_name="Rôle souhaité",
+                    ),
+                ),
+                ("justification", models.TextField(verbose_name="Justification de la demande")),
+                (
+                    "service",
+                    models.CharField(
+                        blank=True, max_length=200, verbose_name="Service d'affectation"
+                    ),
+                ),
+                (
+                    "statut",
+                    models.CharField(
+                        choices=[
+                            ("EN_ATTENTE", "En attente"),
+                            ("APPROUVEE", "Approuvée"),
+                            ("REFUSEE", "Refusée"),
+                        ],
+                        default="EN_ATTENTE",
+                        max_length=20,
+                    ),
+                ),
+                ("motif_rejet", models.TextField(blank=True, verbose_name="Motif du rejet")),
+                ("date_creation", models.DateTimeField(auto_now_add=True)),
+                ("date_traitement", models.DateTimeField(blank=True, null=True)),
+                (
+                    "traite_par",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="demandes_traitees",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Traité par",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': "demande d'accès",
-                'verbose_name_plural': "demandes d'accès",
-                'ordering': ['-date_creation'],
+                "verbose_name": "demande d'accès",
+                "verbose_name_plural": "demandes d'accès",
+                "ordering": ["-date_creation"],
             },
         ),
         migrations.CreateModel(
-            name='Notification',
+            name="Notification",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('titre', models.CharField(max_length=200)),
-                ('message', models.TextField()),
-                ('lu', models.BooleanField(default=False)),
-                ('lien', models.CharField(blank=True, max_length=200, verbose_name='Lien de navigation')),
-                ('date_creation', models.DateTimeField(auto_now_add=True)),
-                ('destinataire', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='notifications', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("titre", models.CharField(max_length=200)),
+                ("message", models.TextField()),
+                ("lu", models.BooleanField(default=False)),
+                (
+                    "lien",
+                    models.CharField(blank=True, max_length=200, verbose_name="Lien de navigation"),
+                ),
+                ("date_creation", models.DateTimeField(auto_now_add=True)),
+                (
+                    "destinataire",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="notifications",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'notification',
-                'verbose_name_plural': 'notifications',
-                'ordering': ['-date_creation'],
+                "verbose_name": "notification",
+                "verbose_name_plural": "notifications",
+                "ordering": ["-date_creation"],
             },
         ),
     ]

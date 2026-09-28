@@ -6,46 +6,135 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('equipment', '0001_initial'),
+        ("equipment", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Panne',
+            name="Panne",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date_signalement', models.DateTimeField(auto_now_add=True)),
-                ('description_signalement', models.TextField(verbose_name='Description initiale de la panne')),
-                ('date_qualification', models.DateTimeField(blank=True, null=True)),
-                ('observation_qualification', models.TextField(blank=True)),
-                ('critere_urgence', models.TextField(blank=True)),
-                ('statut', models.CharField(choices=[('SIGNALEE', 'Signalee'), ('QUALIFIEE', 'Qualifiee'), ('CRITICITE_EVALUEE', 'Criticite evaluee'), ('EN_DIAGNOSTIC', 'En diagnostic'), ('EN_INTERVENTION', 'En intervention'), ('EN_TEST', 'En test'), ('EN_ATTENTE_PIECE', 'En attente de piece'), ('EN_ATTENTE_PRESTATAIRE', 'En attente de prestataire'), ('CLOSE', 'Close')], default='SIGNALEE', max_length=30)),
-                ('critere_impact', models.TextField(blank=True)),
-                ('critere_criticite', models.TextField(blank=True)),
-                ('niveau_criticite', models.CharField(choices=[('CRITIQUE', 'Critique'), ('ELEVE', 'Eleve'), ('MOYEN', 'Moyen'), ('FAIBLE', 'Faible')], default='MOYEN', max_length=20)),
-                ('date_diagnostic', models.DateTimeField(blank=True, null=True)),
-                ('description_diagnostic', models.TextField(blank=True)),
-                ('cause_identifiee', models.TextField(blank=True)),
-                ('resultat_test', models.CharField(choices=[('CONFORME', 'Conforme'), ('SOUS_SURVEILLANCE', 'Sous surveillance'), ('NON_CONFORME', 'Non conforme'), ('TOUJOURS_EN_PANNE', 'Toujours en panne')], default='CONFORME', max_length=30)),
-                ('date_cloture', models.DateTimeField(blank=True, null=True)),
-                ('commentaire_cloture', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('cloturee_par', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='pannes_cloturees', to=settings.AUTH_USER_MODEL)),
-                ('diagnostique_par', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='pannes_diagnostiquees', to=settings.AUTH_USER_MODEL)),
-                ('equipement', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='pannes', to='equipment.equipment')),
-                ('qualifiee_par', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='pannes_qualifiees', to=settings.AUTH_USER_MODEL)),
-                ('signale_par', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='pannes_signalees', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("date_signalement", models.DateTimeField(auto_now_add=True)),
+                (
+                    "description_signalement",
+                    models.TextField(verbose_name="Description initiale de la panne"),
+                ),
+                ("date_qualification", models.DateTimeField(blank=True, null=True)),
+                ("observation_qualification", models.TextField(blank=True)),
+                ("critere_urgence", models.TextField(blank=True)),
+                (
+                    "statut",
+                    models.CharField(
+                        choices=[
+                            ("SIGNALEE", "Signalee"),
+                            ("QUALIFIEE", "Qualifiee"),
+                            ("CRITICITE_EVALUEE", "Criticite evaluee"),
+                            ("EN_DIAGNOSTIC", "En diagnostic"),
+                            ("EN_INTERVENTION", "En intervention"),
+                            ("EN_TEST", "En test"),
+                            ("EN_ATTENTE_PIECE", "En attente de piece"),
+                            ("EN_ATTENTE_PRESTATAIRE", "En attente de prestataire"),
+                            ("CLOSE", "Close"),
+                        ],
+                        default="SIGNALEE",
+                        max_length=30,
+                    ),
+                ),
+                ("critere_impact", models.TextField(blank=True)),
+                ("critere_criticite", models.TextField(blank=True)),
+                (
+                    "niveau_criticite",
+                    models.CharField(
+                        choices=[
+                            ("CRITIQUE", "Critique"),
+                            ("ELEVE", "Eleve"),
+                            ("MOYEN", "Moyen"),
+                            ("FAIBLE", "Faible"),
+                        ],
+                        default="MOYEN",
+                        max_length=20,
+                    ),
+                ),
+                ("date_diagnostic", models.DateTimeField(blank=True, null=True)),
+                ("description_diagnostic", models.TextField(blank=True)),
+                ("cause_identifiee", models.TextField(blank=True)),
+                (
+                    "resultat_test",
+                    models.CharField(
+                        choices=[
+                            ("CONFORME", "Conforme"),
+                            ("SOUS_SURVEILLANCE", "Sous surveillance"),
+                            ("NON_CONFORME", "Non conforme"),
+                            ("TOUJOURS_EN_PANNE", "Toujours en panne"),
+                        ],
+                        default="CONFORME",
+                        max_length=30,
+                    ),
+                ),
+                ("date_cloture", models.DateTimeField(blank=True, null=True)),
+                ("commentaire_cloture", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "cloturee_par",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="pannes_cloturees",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "diagnostique_par",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="pannes_diagnostiquees",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "equipement",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="pannes",
+                        to="equipment.equipment",
+                    ),
+                ),
+                (
+                    "qualifiee_par",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="pannes_qualifiees",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "signale_par",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="pannes_signalees",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'panne',
-                'verbose_name_plural': 'pannes',
-                'ordering': ['-created_at'],
+                "verbose_name": "panne",
+                "verbose_name_plural": "pannes",
+                "ordering": ["-created_at"],
             },
         ),
     ]

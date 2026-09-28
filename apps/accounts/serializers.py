@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
-from .models import User, Etablissement, DemandeAcces, Notification
+
+from .models import DemandeAcces, Etablissement, Notification, User
 
 
 class LoginSerializer(serializers.Serializer):
@@ -18,11 +19,25 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    etablissement_nom = serializers.CharField(source="etablissement.nom", read_only=True, default=None)
+    etablissement_nom = serializers.CharField(
+        source="etablissement.nom", read_only=True, default=None
+    )
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "first_name", "last_name", "role", "matricule", "is_active", "etablissement", "etablissement_nom", "profil_complete")
+        fields = (
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "matricule",
+            "is_active",
+            "etablissement",
+            "etablissement_nom",
+            "profil_complete",
+        )
         read_only_fields = ("id",)
 
 
@@ -31,7 +46,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "password", "first_name", "last_name", "role", "matricule", "etablissement")
+        fields = (
+            "id",
+            "username",
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+            "role",
+            "matricule",
+            "etablissement",
+        )
         read_only_fields = ("id",)
 
     def create(self, validated_data):
@@ -95,6 +120,7 @@ class EtablissementSerializer(serializers.ModelSerializer):
 
 # --- Demande d'accès ---
 
+
 class DemandeAccesCreateSerializer(serializers.ModelSerializer):
     """Serializer pour la soumission d'une demande (public)."""
 
@@ -113,12 +139,27 @@ class DemandeAccesCreateSerializer(serializers.ModelSerializer):
 
 class DemandeAccesSerializer(serializers.ModelSerializer):
     """Serializer pour l'admin (lecture)."""
-    traite_par_username = serializers.CharField(source="traite_par.username", read_only=True, default=None)
+
+    traite_par_username = serializers.CharField(
+        source="traite_par.username", read_only=True, default=None
+    )
 
     class Meta:
         model = DemandeAcces
-        fields = ("id", "nom_complet", "email", "role_souhaite", "justification", "service",
-                  "statut", "traite_par", "traite_par_username", "motif_rejet", "date_creation", "date_traitement")
+        fields = (
+            "id",
+            "nom_complet",
+            "email",
+            "role_souhaite",
+            "justification",
+            "service",
+            "statut",
+            "traite_par",
+            "traite_par_username",
+            "motif_rejet",
+            "date_creation",
+            "date_traitement",
+        )
         read_only_fields = ("id", "date_creation", "date_traitement")
 
 
@@ -128,6 +169,7 @@ class RejectDemandeSerializer(serializers.Serializer):
 
 # --- Notification ---
 
+
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
@@ -136,6 +178,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 # --- Complétion profil ---
+
 
 class CompleteProfileSerializer(serializers.Serializer):
     # L'établissement n'est PAS ici : il est attribué par l'administrateur
@@ -151,5 +194,7 @@ class CompleteProfileSerializer(serializers.Serializer):
 
     def validate_new_password(self, value):
         if value.lower() in ("changeme123!", "changeme123"):
-            raise serializers.ValidationError("Ce mot de passe est trop simple. Choisissez un mot de passe fort.")
+            raise serializers.ValidationError(
+                "Ce mot de passe est trop simple. Choisissez un mot de passe fort."
+            )
         return value

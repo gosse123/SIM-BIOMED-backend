@@ -1,6 +1,7 @@
+from datetime import timedelta
+
 from celery import shared_task
 from django.utils import timezone
-from datetime import timedelta
 
 
 @shared_task
@@ -32,8 +33,8 @@ def generate_preventive_schedule():
     Génère les maintenances préventives futures à partir des plans actifs.
     Exécuté mensuellement via Celery Beat.
     """
-    from apps.preventive.models import MaintenancePlan, MaintenancePreventive
     from apps.equipment.models import Equipment
+    from apps.preventive.models import MaintenancePlan, MaintenancePreventive
 
     plans = MaintenancePlan.objects.all()
     today = timezone.now().date()

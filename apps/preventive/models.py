@@ -1,5 +1,6 @@
-from django.db import models
 from django.core.exceptions import ValidationError
+from django.db import models
+
 from apps.accounts.models import User
 from apps.equipment.models import Equipment
 
@@ -47,7 +48,9 @@ class MaintenancePreventive(models.Model):
         EN_RETARD = "EN_RETARD", "En retard"
 
     plan = models.ForeignKey(MaintenancePlan, on_delete=models.PROTECT, related_name="maintenances")
-    equipement = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name="maintenances_preventives")
+    equipement = models.ForeignKey(
+        Equipment, on_delete=models.PROTECT, related_name="maintenances_preventives"
+    )
 
     statut = models.CharField(max_length=20, choices=Statut.choices, default=Statut.PLANIFIEE)
     date_planifiee = models.DateField()
@@ -70,5 +73,9 @@ class MaintenancePreventive(models.Model):
         return f"Maintenance {self.plan.nom} — {self.equipement.nom} ({self.date_planifiee})"
 
     def clean(self):
-        if self.date_effective and self.date_planifiee and self.date_effective < self.date_planifiee:
+        if (
+            self.date_effective
+            and self.date_planifiee
+            and self.date_effective < self.date_planifiee
+        ):
             raise ValidationError("La date effective ne peut pas précéder la date planifiée.")

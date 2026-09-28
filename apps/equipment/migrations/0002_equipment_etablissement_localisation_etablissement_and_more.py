@@ -5,26 +5,46 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0002_etablissement_user_etablissement'),
-        ('equipment', '0001_initial'),
+        ("accounts", "0002_etablissement_user_etablissement"),
+        ("equipment", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='equipment',
-            name='etablissement',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='equipements', to='accounts.etablissement', verbose_name='Établissement'),
+            model_name="equipment",
+            name="etablissement",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="equipements",
+                to="accounts.etablissement",
+                verbose_name="Établissement",
+            ),
         ),
         migrations.AddField(
-            model_name='localisation',
-            name='etablissement',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='localisations', to='accounts.etablissement', verbose_name='Établissement'),
+            model_name="localisation",
+            name="etablissement",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="localisations",
+                to="accounts.etablissement",
+                verbose_name="Établissement",
+            ),
         ),
         migrations.AddField(
-            model_name='service',
-            name='etablissement',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='services', to='accounts.etablissement', verbose_name='Établissement'),
+            model_name="service",
+            name="etablissement",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="services",
+                to="accounts.etablissement",
+                verbose_name="Établissement",
+            ),
         ),
     ]

@@ -1,6 +1,7 @@
 import pytest
 from django.test import Client
-from apps.accounts.models import User, Etablissement, DemandeAcces, Notification
+
+from apps.accounts.models import DemandeAcces, Etablissement, Notification, User
 
 
 @pytest.fixture
@@ -47,7 +48,11 @@ def tech_user(etab):
 
 
 def _login(client, username, password):
-    resp = client.post("/api/auth/login/", {"username": username, "password": password}, content_type="application/json")
+    resp = client.post(
+        "/api/auth/login/",
+        {"username": username, "password": password},
+        content_type="application/json",
+    )
     return resp.json()["access"]
 
 
@@ -57,7 +62,9 @@ def _approve_demande(api_client, demande):
     Le mot de passe n'est transmis que dans la réponse API destinée à
     l'administrateur — jamais persisté (notification, base)."""
     token = _login(api_client, "admin_demande", "Admin123!")
-    resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+    resp = api_client.post(
+        f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+    )
     assert resp.status_code == 200
     password = resp.json().get("temp_password")
     assert password, "La réponse d'approbation doit contenir temp_password"
@@ -66,59 +73,84 @@ def _approve_demande(api_client, demande):
 
 # ======================== Request Access ========================
 
+
 @pytest.mark.django_db
 class TestRequestAccess:
     def test_submit_demande_success(self, api_client):
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Jean Dupont",
-            "email": "jean@hospital.com",
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Je suis technicien biomédical.",
-            "service": "Biomedical",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Jean Dupont",
+                "email": "jean@hospital.com",
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Je suis technicien biomédical.",
+                "service": "Biomedical",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 201
         assert DemandeAcces.objects.filter(email="jean@hospital.com").exists()
 
     def test_submit_demande_duplicate_email_pending(self, api_client):
-        api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Jean Dupont",
-            "email": "dup@hospital.com",
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Test",
-        }, content_type="application/json")
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Jean Autre",
-            "email": "dup@hospital.com",
-            "role_souhaite": "PERSONNEL_SOIGNANT",
-            "justification": "Test 2",
-        }, content_type="application/json")
+        api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Jean Dupont",
+                "email": "dup@hospital.com",
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Test",
+            },
+            content_type="application/json",
+        )
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Jean Autre",
+                "email": "dup@hospital.com",
+                "role_souhaite": "PERSONNEL_SOIGNANT",
+                "justification": "Test 2",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 400
 
     def test_submit_demande_existing_user_email(self, api_client, tech_user):
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Test",
-            "email": tech_user.email,
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Test",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Test",
+                "email": tech_user.email,
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Test",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 400
 
     def test_submit_demande_admin_role_forbidden(self, api_client):
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Hack Admin",
-            "email": "hack@hospital.com",
-            "role_souhaite": "ADMINISTRATEUR",
-            "justification": "Want admin",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Hack Admin",
+                "email": "hack@hospital.com",
+                "role_souhaite": "ADMINISTRATEUR",
+                "justification": "Want admin",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 400
 
     def test_submit_demande_biomed_role_forbidden(self, api_client):
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Hack Biomed",
-            "email": "hack2@hospital.com",
-            "role_souhaite": "RESPONSABLE_BIOMEDICAL",
-            "justification": "Want biomed",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Hack Biomed",
+                "email": "hack2@hospital.com",
+                "role_souhaite": "RESPONSABLE_BIOMEDICAL",
+                "justification": "Want biomed",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 400
 
     def test_submit_demande_missing_fields(self, api_client):
@@ -128,15 +160,20 @@ class TestRequestAccess:
 
 # ======================== Admin List Demandes ========================
 
+
 @pytest.mark.django_db
 class TestListDemandes:
     def _create_demande(self, api_client, email="test@h.com"):
-        api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Test User",
-            "email": email,
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Test",
-        }, content_type="application/json")
+        api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Test User",
+                "email": email,
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Test",
+            },
+            content_type="application/json",
+        )
 
     def test_admin_can_list_demandes(self, api_client, admin_user):
         self._create_demande(api_client, "a@h.com")
@@ -151,7 +188,9 @@ class TestListDemandes:
     def test_admin_can_filter_by_statut(self, api_client, admin_user):
         self._create_demande(api_client, "c@h.com")
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.get("/api/demandes/?statut=EN_ATTENTE", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.get(
+            "/api/demandes/?statut=EN_ATTENTE", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 200
 
     def test_biomed_cannot_list_demandes(self, api_client, biomed_user):
@@ -167,22 +206,29 @@ class TestListDemandes:
 
 # ======================== Approve / Reject ========================
 
+
 @pytest.mark.django_db
 class TestApproveDemande:
     def _create_demande(self, api_client, email="approve@h.com"):
-        api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Approuver Test",
-            "email": email,
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Je veux être tech.",
-            "service": "Cardiologie",
-        }, content_type="application/json")
+        api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Approuver Test",
+                "email": email,
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Je veux être tech.",
+                "service": "Cardiologie",
+            },
+            content_type="application/json",
+        )
         return DemandeAcces.objects.get(email=email)
 
     def test_admin_can_approve(self, api_client, admin_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 200
 
         # Vérifier que l'utilisateur a été créé
@@ -197,14 +243,20 @@ class TestApproveDemande:
     def test_admin_cannot_approve_twice(self, api_client, admin_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "admin_demande", "Admin123!")
-        api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
-        resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 400
 
     def test_biomed_cannot_approve(self, api_client, biomed_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "biomed_demande", "Biomed123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 403
 
     def test_approve_nonexistent_returns_404(self, api_client, admin_user):
@@ -215,7 +267,9 @@ class TestApproveDemande:
     def test_approved_user_has_profil_complete_false(self, api_client, admin_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "admin_demande", "Admin123!")
-        api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         user = User.objects.get(email="approve@h.com")
         assert user.profil_complete is False
         assert user.is_active is True
@@ -224,20 +278,29 @@ class TestApproveDemande:
 @pytest.mark.django_db
 class TestRejectDemande:
     def _create_demande(self, api_client, email="reject@h.com"):
-        api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Rejeter Test",
-            "email": email,
-            "role_souhaite": "PERSONNEL_SOIGNANT",
-            "justification": "Je veux être soignant.",
-        }, content_type="application/json")
+        api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Rejeter Test",
+                "email": email,
+                "role_souhaite": "PERSONNEL_SOIGNANT",
+                "justification": "Je veux être soignant.",
+            },
+            content_type="application/json",
+        )
         return DemandeAcces.objects.get(email=email)
 
     def test_admin_can_reject(self, api_client, admin_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/reject/", {
-            "motif": "Profil non qualifié.",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/reject/",
+            {
+                "motif": "Profil non qualifié.",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
         assert resp.status_code == 200
         demande.refresh_from_db()
         assert demande.statut == DemandeAcces.Statut.REFUSEE
@@ -246,7 +309,9 @@ class TestRejectDemande:
     def test_admin_can_reject_without_motif(self, api_client, admin_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/reject/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/reject/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 200
         demande.refresh_from_db()
         assert demande.statut == DemandeAcces.Statut.REFUSEE
@@ -254,21 +319,28 @@ class TestRejectDemande:
     def test_biomed_cannot_reject(self, api_client, biomed_user):
         demande = self._create_demande(api_client)
         token = _login(api_client, "biomed_demande", "Biomed123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/reject/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/reject/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 403
 
 
 # ======================== Notifications ========================
 
+
 @pytest.mark.django_db
 class TestNotifications:
     def _create_approved_user(self, api_client, admin_user, email="notif@h.com"):
-        api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Notif Test",
-            "email": email,
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Test",
-        }, content_type="application/json")
+        api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Notif Test",
+                "email": email,
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Test",
+            },
+            content_type="application/json",
+        )
         demande = DemandeAcces.objects.get(email=email)
         password = _approve_demande(api_client, demande)
         return User.objects.get(email=email), password
@@ -284,7 +356,9 @@ class TestNotifications:
         user, password = self._create_approved_user(api_client, admin_user)
         notif = user.notifications.first()
         token = _login(api_client, user.username, password)
-        resp = api_client.post(f"/api/notifications/{notif.id}/read/", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            f"/api/notifications/{notif.id}/read/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
         assert resp.status_code == 200
         notif.refresh_from_db()
         assert notif.lu is True
@@ -303,6 +377,7 @@ class TestNotifications:
 
 # ======================== Profile Completion ========================
 
+
 @pytest.mark.django_db
 class TestProfileCompletion:
     def test_uncomplete_profile_returns_false(self, api_client, admin_user):
@@ -314,11 +389,16 @@ class TestProfileCompletion:
 
     def test_complete_profile_success(self, api_client, admin_user, etab):
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "matricule": "MAT-001",
-            "service": "Cardiologie",
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "matricule": "MAT-001",
+                "service": "Cardiologie",
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
         assert resp.status_code == 200
         admin_user.refresh_from_db()
         assert admin_user.profil_complete is True
@@ -328,41 +408,61 @@ class TestProfileCompletion:
         admin_user.profil_complete = True
         admin_user.save()
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "matricule": "MAT-002",
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "matricule": "MAT-002",
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
         assert resp.status_code == 400
 
     def test_complete_profile_missing_matricule(self, api_client, admin_user, etab):
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
         assert resp.status_code == 400
 
     def test_complete_profile_ignore_etablissement_payload(self, api_client, admin_user, etab):
         """Un champ etablissement dans la payload n'a aucun effet (cloisonnement)."""
         autre_etab = Etablissement.objects.create(nom="Autre Hôpital")
         token = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "matricule": "MAT-003",
-            "etablissement": autre_etab.id,
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token}")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "matricule": "MAT-003",
+                "etablissement": autre_etab.id,
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
         assert resp.status_code == 200
         admin_user.refresh_from_db()
         assert admin_user.etablissement == etab  # inchangé
 
     def test_unauthenticated_cannot_complete_profile(self, api_client, etab):
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "matricule": "MAT-004",
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "matricule": "MAT-004",
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 401
 
 
 # ======================== Etablissements List ========================
+
 
 @pytest.mark.django_db
 class TestEtablissementsList:
@@ -385,25 +485,32 @@ class TestEtablissementsList:
 
 # ======================== Full Workflow E2E ========================
 
+
 @pytest.mark.django_db
 class TestFullWorkflowE2E:
     def test_complete_lifecycle(self, api_client, admin_user, etab):
         """Test complet : demande → admin approuve → user se connecte → complète profil."""
         # 1. Soumettre la demande
-        resp = api_client.post("/api/auth/request-access/", {
-            "nom_complet": "Marie Curie",
-            "email": "marie@hospital.com",
-            "role_souhaite": "TECHNICIEN",
-            "justification": "Technicienne biomédicale expérimentée.",
-            "service": "Radiologie",
-        }, content_type="application/json")
+        resp = api_client.post(
+            "/api/auth/request-access/",
+            {
+                "nom_complet": "Marie Curie",
+                "email": "marie@hospital.com",
+                "role_souhaite": "TECHNICIEN",
+                "justification": "Technicienne biomédicale expérimentée.",
+                "service": "Radiologie",
+            },
+            content_type="application/json",
+        )
         assert resp.status_code == 201
         demande = DemandeAcces.objects.get(email="marie@hospital.com")
         assert demande.statut == DemandeAcces.Statut.EN_ATTENTE
 
         # 2. Admin approuve
         token_admin = _login(api_client, "admin_demande", "Admin123!")
-        resp = api_client.post(f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token_admin}")
+        resp = api_client.post(
+            f"/api/demandes/{demande.id}/approve/", HTTP_AUTHORIZATION=f"Bearer {token_admin}"
+        )
         assert resp.status_code == 200
         user = User.objects.get(email="marie@hospital.com")
         assert user.username == "marie"  # email prefix
@@ -424,18 +531,27 @@ class TestFullWorkflowE2E:
         assert resp.json()["profil_complete"] is False
 
         # 5. Vérifie profil pas complet
-        resp = api_client.get("/api/auth/profile-complete/", HTTP_AUTHORIZATION=f"Bearer {token_user}")
+        resp = api_client.get(
+            "/api/auth/profile-complete/", HTTP_AUTHORIZATION=f"Bearer {token_user}"
+        )
         assert resp.json()["profil_complete"] is False
 
         # 6. Complète le profil
-        resp = api_client.post("/api/auth/complete-profile/", {
-            "matricule": "NUR-123",
-            "etablissement": etab.id,
-            "service": "Radiologie",
-            "new_password": "NouveauMot2024!",
-        }, content_type="application/json", HTTP_AUTHORIZATION=f"Bearer {token_user}")
+        resp = api_client.post(
+            "/api/auth/complete-profile/",
+            {
+                "matricule": "NUR-123",
+                "etablissement": etab.id,
+                "service": "Radiologie",
+                "new_password": "NouveauMot2024!",
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {token_user}",
+        )
         assert resp.status_code == 200
 
         # 7. Vérifie profil complet
-        resp = api_client.get("/api/auth/profile-complete/", HTTP_AUTHORIZATION=f"Bearer {token_user}")
+        resp = api_client.get(
+            "/api/auth/profile-complete/", HTTP_AUTHORIZATION=f"Bearer {token_user}"
+        )
         assert resp.json()["profil_complete"] is True

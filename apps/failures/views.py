@@ -1,40 +1,43 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from apps.accounts.permissions import (
-    CanReportFailure,
-    CanQualifyFailure,
-    CanDiagnoseFailure,
     CanCloseFailure,
+    CanDiagnoseFailure,
     CanEvaluateCriticite,
-    CanStartIntervention,
     CanManageWaitState,
+    CanQualifyFailure,
+    CanReportFailure,
+    CanStartIntervention,
     CanStartTest,
 )
 from apps.accounts.scoping import scope_to_etablissement
 from apps.audit.models import create_audit_log
-from domain.failure.transitions import verifier_transition, TransitionInvalide
+from domain.failure.transitions import TransitionInvalideError, verifier_transition
+
 from .models import Panne
 from .serializers import (
-    PanneListSerializer,
-    PanneDetailSerializer,
-    ReportPanneSerializer,
-    QualifyPanneSerializer,
-    EvaluateCriticiteSerializer,
+    ClosePanneSerializer,
     DiagnosePanneSerializer,
+    EvaluateCriticiteSerializer,
+    PanneDetailSerializer,
+    PanneListSerializer,
+    QualifyPanneSerializer,
+    ReportPanneSerializer,
     StartInterventionSerializer,
+    StartTestSerializer,
     WaitPieceSerializer,
     WaitPrestataireSerializer,
-    StartTestSerializer,
-    ClosePanneSerializer,
 )
 
 
 class PanneViewSet(viewsets.ModelViewSet):
     """Gestion du cycle de vie des pannes (RB-SEC-002 à RB-SEC-008)."""
+
     queryset = Panne.objects.select_related("equipement", "signale_par").all()
     permission_classes = [IsAuthenticated]
     http_method_names = ["get", "post", "patch", "head", "options"]
@@ -106,7 +109,9 @@ class PanneViewSet(viewsets.ModelViewSet):
         )
         return Response(PanneDetailSerializer(panne).data, status=status.HTTP_201_CREATED)
 
-    def perform_transition(self, request, panne_id, new_statut, serializer_class, audit_action, **extra_fields):
+    def perform_transition(
+        self, request, panne_id, new_statut, serializer_class, audit_action, **extra_fields
+    ):
         """Exécuter une transition de statut avec audit."""
         try:
             # Cloisonnement appliqué aussi aux actions sur un objet précis
@@ -118,9 +123,11 @@ class PanneViewSet(viewsets.ModelViewSet):
         # Règle métier RB-004 : la transition est validée par la couche domaine
         try:
             verifier_transition(ancien_statut, new_statut)
-        except TransitionInvalide as e:
+        except TransitionInvalideError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = serializer_class(data=request.data, instance=panne, context={"request": request})
+        serializer = serializer_class(
+            data=request.data, instance=panne, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         panne.statut = new_statut
         for key, val in serializer.validated_data.items():
@@ -148,7 +155,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def evaluate_criticite(self, request, pk=None):
         """Évaluer la criticité — QUALIFIEE → CRITICITE_EVALUEE."""
         return self.perform_transition(
-            request, pk, Panne.Statut.CRITICITE_EVALUEE, EvaluateCriticiteSerializer,
+            request,
+            pk,
+            Panne.Statut.CRITICITE_EVALUEE,
+            EvaluateCriticiteSerializer,
             audit_action="panne.evaluate_criticite",
         )
 
@@ -156,7 +166,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def qualify(self, request, pk=None):
         """Qualifier une panne — SIGNALEE → QUALIFIEE."""
         return self.perform_transition(
-            request, pk, Panne.Statut.QUALIFIEE, QualifyPanneSerializer,
+            request,
+            pk,
+            Panne.Statut.QUALIFIEE,
+            QualifyPanneSerializer,
             audit_action="panne.qualify",
             qualifiee_par=request.user,
             date_qualification=timezone.now(),
@@ -166,7 +179,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def diagnose(self, request, pk=None):
         """Diagnostiquer — CRITICITE_EVALUEE → EN_DIAGNOSTIC."""
         return self.perform_transition(
-            request, pk, Panne.Statut.EN_DIAGNOSTIC, DiagnosePanneSerializer,
+            request,
+            pk,
+            Panne.Statut.EN_DIAGNOSTIC,
+            DiagnosePanneSerializer,
             audit_action="panne.diagnose",
             diagnostique_par=request.user,
             date_diagnostic=timezone.now(),
@@ -176,7 +192,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def start_intervention(self, request, pk=None):
         """Démarrer l'intervention — EN_DIAGNOSTIC → EN_INTERVENTION."""
         return self.perform_transition(
-            request, pk, Panne.Statut.EN_INTERVENTION, StartInterventionSerializer,
+            request,
+            pk,
+            Panne.Statut.EN_INTERVENTION,
+            StartInterventionSerializer,
             audit_action="panne.start_intervention",
         )
 
@@ -184,7 +203,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def wait_piece(self, request, pk=None):
         """Mettre en attente de pièce."""
         return self.perform_transition(
-            request, pk, Panne.Statut.EN_ATTENTE_PIECE, WaitPieceSerializer,
+            request,
+            pk,
+            Panne.Statut.EN_ATTENTE_PIECE,
+            WaitPieceSerializer,
             audit_action="panne.wait_piece",
         )
 
@@ -192,7 +214,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def wait_prestataire(self, request, pk=None):
         """Mettre en attente de prestataire."""
         return self.perform_transition(
-            request, pk, Panne.Statut.EN_ATTENTE_PRESTATAIRE, WaitPrestataireSerializer,
+            request,
+            pk,
+            Panne.Statut.EN_ATTENTE_PRESTATAIRE,
+            WaitPrestataireSerializer,
             audit_action="panne.wait_prestataire",
         )
 
@@ -200,7 +225,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def start_test(self, request, pk=None):
         """Lancer le test — EN_INTERVENTION → EN_TEST."""
         return self.perform_transition(
-            request, pk, Panne.Statut.EN_TEST, StartTestSerializer,
+            request,
+            pk,
+            Panne.Statut.EN_TEST,
+            StartTestSerializer,
             audit_action="panne.start_test",
         )
 
@@ -208,7 +236,10 @@ class PanneViewSet(viewsets.ModelViewSet):
     def close(self, request, pk=None):
         """Clôturer — EN_TEST → CLOSE. Test conforme obligatoire (RB-CL-001)."""
         return self.perform_transition(
-            request, pk, Panne.Statut.CLOSE, ClosePanneSerializer,
+            request,
+            pk,
+            Panne.Statut.CLOSE,
+            ClosePanneSerializer,
             audit_action="panne.close",
             cloturee_par=request.user,
             date_cloture=timezone.now(),

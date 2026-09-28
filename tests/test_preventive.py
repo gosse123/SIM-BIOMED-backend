@@ -1,8 +1,9 @@
 import pytest
 from rest_framework.test import APIClient
+
 from apps.accounts.models import User
-from apps.equipment.models import Equipment, Service, Localisation
-from apps.preventive.models import MaintenancePlan, MaintenancePreventive
+from apps.equipment.models import Equipment, Localisation, Service
+from apps.preventive.models import MaintenancePlan
 
 
 @pytest.fixture

@@ -26,7 +26,9 @@ class AuditLog(models.Model):
         return f"{self.utilisateur} — {self.action} — {self.entite}#{self.entite_id}"
 
 
-def create_audit_log(utilisateur, action, entite, entite_id, ancienne_valeur=None, nouvelle_valeur=None):
+def create_audit_log(
+    utilisateur, action, entite, entite_id, ancienne_valeur=None, nouvelle_valeur=None
+):
     """Helper pour créer un log d'audit."""
     return AuditLog.objects.create(
         utilisateur=utilisateur,

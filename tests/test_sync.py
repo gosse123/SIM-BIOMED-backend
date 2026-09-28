@@ -1,9 +1,11 @@
-import pytest
-from django.test import Client
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from apps.sync.models import OfflineOperation
 import json
+
+import pytest
+from django.contrib.auth import get_user_model
+from django.test import Client
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.sync.models import OfflineOperation
 
 User = get_user_model()
 
@@ -77,7 +79,7 @@ def test_idempotency_first_request_proceeds(api_client, admin_user, auth_headers
     offline_id = "test-uuid-001"
 
     # Simuler un POST equipment (sans verifier la validite du payload)
-    response = api_client.post(
+    api_client.post(
         "/api/equipment/",
         data=json.dumps({"nom": "Test", "num_inventaire": "T001"}),
         content_type="application/json",
@@ -116,7 +118,7 @@ def test_idempotency_duplicate_returns_cached(api_client, admin_user, auth_heade
     ).exists()
 
     # La requête passe normalement (le middleware ne peut pas intercepter avec Client())
-    response = api_client.post(
+    api_client.post(
         "/api/equipment/",
         data=json.dumps({"nom": "DUPLICATE"}),
         content_type="application/json",
@@ -148,6 +150,7 @@ def test_idempotency_failed_allows_retry(api_client, admin_user):
 
     # Simuler process_request : l'entrée ERREUR ne doit pas être supprimée
     from django.test import RequestFactory
+
     from apps.sync.middleware import OfflineIdempotencyMiddleware
 
     factory = RequestFactory()
@@ -163,8 +166,9 @@ def test_idempotency_failed_allows_retry(api_client, admin_user):
 
     assert result is None, "Le retry doit être autorisé (pas de réponse cachée)"
     entry = OfflineOperation.objects.get(offline_id=offline_id)
-    assert entry.statut == OfflineOperation.StatutExecution.ERREUR, \
+    assert entry.statut == OfflineOperation.StatutExecution.ERREUR, (
         "L'entrée ERREUR doit être conservée (pas de suppression silencieuse)"
+    )
     assert request._offline_id == offline_id
     assert request._parsed_body == {"nom": "RETRY"}
 
@@ -173,8 +177,9 @@ def test_idempotency_failed_allows_retry(api_client, admin_user):
 def test_replay_same_offline_id_single_mutation(admin_user):
     """Rejouer la même entrée (même X-Offline-Id) ne produit qu'une seule mutation :
     la seconde requête reçoit la réponse cachée sans exécuter la vue."""
-    from django.test import RequestFactory
     from django.http import JsonResponse
+    from django.test import RequestFactory
+
     from apps.sync.middleware import OfflineIdempotencyMiddleware
 
     calls = {"count": 0}
@@ -251,9 +256,9 @@ def test_retry_failed_admin_ok(api_client, admin_user, auth_headers):
     assert data["count"] == 2
 
     # Verifier qu'elles sont supprimees
-    assert OfflineOperation.objects.filter(
-        statut=OfflineOperation.StatutExecution.ERREUR
-    ).count() == 0
+    assert (
+        OfflineOperation.objects.filter(statut=OfflineOperation.StatutExecution.ERREUR).count() == 0
+    )
 
 
 @pytest.mark.django_db

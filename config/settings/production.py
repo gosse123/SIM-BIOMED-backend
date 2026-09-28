@@ -1,5 +1,6 @@
-from .base import *  # noqa: F401, F403
 import os
+
+from .base import *  # noqa: F401, F403
 
 DEBUG = False
 
@@ -17,9 +18,7 @@ CORS_ALLOWED_ORIGINS = [
 
 # CSRF
 CSRF_TRUSTED_ORIGINS = [
-    o.strip()
-    for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
-    if o.strip()
+    o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
 ]
 
 # HTTPS / HSTS
@@ -38,7 +37,7 @@ X_FRAME_OPTIONS = "DENY"
 # Database
 DATABASES["default"]["HOST"] = os.environ.get("DB_HOST", "db")  # noqa: F405
 DATABASES["default"]["PORT"] = os.environ.get("DB_PORT", "5432")  # noqa: F405
-DATABASES["default"]["CONN_MAX_AGE"] = 600
+DATABASES["default"]["CONN_MAX_AGE"] = 600  # noqa: F405
 
 # Static files
 STATIC_ROOT = BASE_DIR / "staticfiles"  # noqa: F405
@@ -50,7 +49,10 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "json": {
-            "format": '{"time":"%(asctime)s","level":"%(levelname)s","name":"%(name)s","message":"%(message)s"}',
+            "format": (
+                '{"time":"%(asctime)s","level":"%(levelname)s",'
+                '"name":"%(name)s","message":"%(message)s"}'
+            ),
         },
     },
     "handlers": {

@@ -6,51 +6,118 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('equipment', '0001_initial'),
+        ("equipment", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='MaintenancePlan',
+            name="MaintenancePlan",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nom', models.CharField(max_length=300)),
-                ('description', models.TextField(blank=True)),
-                ('type_equipement', models.CharField(max_length=200, verbose_name="Type d'équipement concerné")),
-                ('frequence', models.CharField(choices=[('HEBDOMADAIRE', 'Hebdomadaire'), ('BIMENSUELLE', 'Bimensuelle'), ('MENSUELLE', 'Mensuelle'), ('TRIMESTRIELLE', 'Trimestrielle'), ('SEMESTRIELLE', 'Semestrielle'), ('ANNUELLE', 'Annuelle')], max_length=20)),
-                ('delai_jours', models.PositiveIntegerField(help_text='Nombre de jours entre chaque maintenance préventive', verbose_name='Délai entre maintenances (jours)')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("nom", models.CharField(max_length=300)),
+                ("description", models.TextField(blank=True)),
+                (
+                    "type_equipement",
+                    models.CharField(max_length=200, verbose_name="Type d'équipement concerné"),
+                ),
+                (
+                    "frequence",
+                    models.CharField(
+                        choices=[
+                            ("HEBDOMADAIRE", "Hebdomadaire"),
+                            ("BIMENSUELLE", "Bimensuelle"),
+                            ("MENSUELLE", "Mensuelle"),
+                            ("TRIMESTRIELLE", "Trimestrielle"),
+                            ("SEMESTRIELLE", "Semestrielle"),
+                            ("ANNUELLE", "Annuelle"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "delai_jours",
+                    models.PositiveIntegerField(
+                        help_text="Nombre de jours entre chaque maintenance préventive",
+                        verbose_name="Délai entre maintenances (jours)",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'verbose_name': 'plan de maintenance',
-                'verbose_name_plural': 'plans de maintenance',
-                'ordering': ['nom'],
+                "verbose_name": "plan de maintenance",
+                "verbose_name_plural": "plans de maintenance",
+                "ordering": ["nom"],
             },
         ),
         migrations.CreateModel(
-            name='MaintenancePreventive',
+            name="MaintenancePreventive",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('statut', models.CharField(choices=[('PLANIFIEE', 'Planifiée'), ('EN_COURS', 'En cours'), ('TERMINEE', 'Terminée'), ('ANNULEE', 'Annulée'), ('EN_RETARD', 'En retard')], default='PLANIFIEE', max_length=20)),
-                ('date_planifiee', models.DateField()),
-                ('date_effective', models.DateField(blank=True, null=True)),
-                ('commentaire', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('equipement', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='maintenances_preventives', to='equipment.equipment')),
-                ('plan', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='maintenances', to='preventive.maintenanceplan')),
-                ('realisee_par', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='maintenances_realisees', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "statut",
+                    models.CharField(
+                        choices=[
+                            ("PLANIFIEE", "Planifiée"),
+                            ("EN_COURS", "En cours"),
+                            ("TERMINEE", "Terminée"),
+                            ("ANNULEE", "Annulée"),
+                            ("EN_RETARD", "En retard"),
+                        ],
+                        default="PLANIFIEE",
+                        max_length=20,
+                    ),
+                ),
+                ("date_planifiee", models.DateField()),
+                ("date_effective", models.DateField(blank=True, null=True)),
+                ("commentaire", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "equipement",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="maintenances_preventives",
+                        to="equipment.equipment",
+                    ),
+                ),
+                (
+                    "plan",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="maintenances",
+                        to="preventive.maintenanceplan",
+                    ),
+                ),
+                (
+                    "realisee_par",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="maintenances_realisees",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'maintenance préventive',
-                'verbose_name_plural': 'maintenances préventives',
-                'ordering': ['date_planifiee'],
+                "verbose_name": "maintenance préventive",
+                "verbose_name_plural": "maintenances préventives",
+                "ordering": ["date_planifiee"],
             },
         ),
     ]

@@ -1,7 +1,8 @@
 import pytest
 from rest_framework.test import APIClient
+
 from apps.accounts.models import User
-from apps.equipment.models import Equipment, Service, Localisation
+from apps.equipment.models import Equipment, Localisation, Service
 from apps.failures.models import Panne
 from apps.interventions.models import Intervention
 
@@ -77,7 +78,12 @@ def test_start_intervention(api_client, biomed_user, equipment, panne):
     api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
-        {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
+        {
+            "panne": panne.id,
+            "equipement": equipment.id,
+            "type_intervention": "CORRECTIVE",
+            "description": "Test",
+        },
         format="json",
     )
     intervention_id = create_resp.json()["id"]
@@ -92,7 +98,12 @@ def test_finish_intervention(api_client, biomed_user, equipment, panne):
     api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
-        {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
+        {
+            "panne": panne.id,
+            "equipement": equipment.id,
+            "type_intervention": "CORRECTIVE",
+            "description": "Test",
+        },
         format="json",
     )
     intervention_id = create_resp.json()["id"]
@@ -112,7 +123,12 @@ def test_cannot_finish_not_started(api_client, biomed_user, equipment, panne):
     api_client.force_authenticate(user=biomed_user)
     create_resp = api_client.post(
         "/api/interventions/",
-        {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
+        {
+            "panne": panne.id,
+            "equipement": equipment.id,
+            "type_intervention": "CORRECTIVE",
+            "description": "Test",
+        },
         format="json",
     )
     intervention_id = create_resp.json()["id"]
@@ -125,7 +141,12 @@ def test_list_interventions(api_client, biomed_user, equipment, panne):
     api_client.force_authenticate(user=biomed_user)
     api_client.post(
         "/api/interventions/",
-        {"panne": panne.id, "equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test"},
+        {
+            "panne": panne.id,
+            "equipement": equipment.id,
+            "type_intervention": "CORRECTIVE",
+            "description": "Test",
+        },
         format="json",
     )
     resp = api_client.get("/api/interventions/")
@@ -134,7 +155,12 @@ def test_list_interventions(api_client, biomed_user, equipment, panne):
 
 
 def _quick_intervention(api_client, equipment, panne=None, **extra):
-    payload = {"equipement": equipment.id, "type_intervention": "CORRECTIVE", "description": "Test", **extra}
+    payload = {
+        "equipement": equipment.id,
+        "type_intervention": "CORRECTIVE",
+        "description": "Test",
+        **extra,
+    }
     if panne:
         payload["panne"] = panne.id
     resp = api_client.post("/api/interventions/", payload, format="json")
@@ -143,7 +169,9 @@ def _quick_intervention(api_client, equipment, panne=None, **extra):
 
 
 @pytest.mark.django_db
-def test_create_hors_service_total_met_equipement_hors_service(api_client, biomed_user, equipment, panne):
+def test_create_hors_service_total_met_equipement_hors_service(
+    api_client, biomed_user, equipment, panne
+):
     """Nouvelle intervention avec hors_service_total → équipement HORS_SERVICE (RB-CL-002)."""
     api_client.force_authenticate(user=biomed_user)
     _quick_intervention(api_client, equipment, panne, hors_service_total=True)
@@ -178,7 +206,9 @@ def test_finish_repare_totalement_remise_fonctionnel(api_client, biomed_user, eq
 
 
 @pytest.mark.django_db
-def test_finish_repare_totalement_ne_cloture_pas_la_panne(api_client, biomed_user, equipment, panne):
+def test_finish_repare_totalement_ne_cloture_pas_la_panne(
+    api_client, biomed_user, equipment, panne
+):
     """RB-CL-001 : même si l'équipement est réparé, la panne liée reste ouverte
     tant qu'il n'y a pas de résultat de test."""
     api_client.force_authenticate(user=biomed_user)
@@ -197,11 +227,14 @@ def test_finish_repare_totalement_ne_cloture_pas_la_panne(api_client, biomed_use
 def test_create_intervention_equipement_autre_etablissement_refuse(api_client, equipment):
     """Cloisonnement : intervention sur l'équipement d'un autre établissement → 400."""
     from apps.accounts.models import Etablissement
+
     etab_a = Etablissement.objects.create(nom="Hôpital A")
     etab_b = Etablissement.objects.create(nom="Hôpital B")
     admin_b = User.objects.create_user(
-        username="admin_b_int", password="Test1234!",
-        role=User.Role.ADMINISTRATEUR, etablissement=etab_b,
+        username="admin_b_int",
+        password="Test1234!",
+        role=User.Role.ADMINISTRATEUR,
+        etablissement=etab_b,
     )
     equipment.etablissement = etab_a
     equipment.save(update_fields=["etablissement"])
@@ -218,11 +251,12 @@ def test_create_intervention_equipement_autre_etablissement_refuse(api_client, e
 @pytest.mark.django_db
 def test_list_interventions_priorisee_par_criticite(api_client, biomed_user, equipment, panne):
     """RB-PR-004 : la liste est ordonnée par criticité de la panne liée."""
-    from apps.equipment.models import Equipment as E
     api_client.force_authenticate(user=biomed_user)
     panne_critique = Panne.objects.create(
-        equipement=equipment, signale_par=biomed_user,
-        description_signalement="urgence", statut=Panne.Statut.EN_INTERVENTION,
+        equipement=equipment,
+        signale_par=biomed_user,
+        description_signalement="urgence",
+        statut=Panne.Statut.EN_INTERVENTION,
         niveau_criticite="CRITIQUE",
     )
     panne.niveau_criticite = "FAIBLE"

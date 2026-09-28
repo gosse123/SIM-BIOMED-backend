@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from django.utils import timezone
-from .models import Panne
+
 from apps.accounts.serializers import UserSerializer
 from apps.equipment.serializers import EquipmentListSerializer
+
+from .models import Panne
 
 
 class PanneListSerializer(serializers.ModelSerializer):
@@ -85,8 +86,11 @@ class ReportPanneSerializer(serializers.ModelSerializer):
 
     def validate_equipement(self, value):
         from apps.equipment.models import Equipment
+
         if value.etat_operationnel == Equipment.StatutOperationnel.REFORME:
-            raise serializers.ValidationError("Impossible de signaler une panne sur un equipement reforme.")
+            raise serializers.ValidationError(
+                "Impossible de signaler une panne sur un equipement reforme."
+            )
         return value
 
     def create(self, validated_data):
@@ -109,7 +113,9 @@ class QualifyPanneSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         panne = self.instance
         if panne.statut != Panne.Statut.SIGNALEE:
-            raise serializers.ValidationError("Seules les pannes en etat SIGNALEE peuvent etre qualifiees.")
+            raise serializers.ValidationError(
+                "Seules les pannes en etat SIGNALEE peuvent etre qualifiees."
+            )
         return attrs
 
 
@@ -123,7 +129,9 @@ class EvaluateCriticiteSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         panne = self.instance
         if panne.statut != Panne.Statut.QUALIFIEE:
-            raise serializers.ValidationError("Seules les pannes QUALIFIEES peuvent avoir leur criticite evaluee.")
+            raise serializers.ValidationError(
+                "Seules les pannes QUALIFIEES peuvent avoir leur criticite evaluee."
+            )
         return attrs
 
 
@@ -137,31 +145,41 @@ class DiagnosePanneSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         panne = self.instance
         if panne.statut != Panne.Statut.CRITICITE_EVALUEE:
-            raise serializers.ValidationError("Seules les pannes avec criticite evaluee peuvent etre diagnostiquees.")
+            raise serializers.ValidationError(
+                "Seules les pannes avec criticite evaluee peuvent etre diagnostiquees."
+            )
         if not attrs.get("description_diagnostic", "").strip():
-            raise serializers.ValidationError({"description_diagnostic": "Le diagnostic est obligatoire."})
+            raise serializers.ValidationError(
+                {"description_diagnostic": "Le diagnostic est obligatoire."}
+            )
         if not attrs.get("cause_identifiee", "").strip():
-            raise serializers.ValidationError({"cause_identifiee": "La cause identifiee est obligatoire."})
+            raise serializers.ValidationError(
+                {"cause_identifiee": "La cause identifiee est obligatoire."}
+            )
         return attrs
 
 
 class StartInterventionSerializer(serializers.Serializer):
     """Demarrage d'intervention — declenche EN_INTERVENTION."""
+
     pass
 
 
 class WaitPieceSerializer(serializers.Serializer):
     """Mise en attente de piece."""
+
     pass
 
 
 class WaitPrestataireSerializer(serializers.Serializer):
     """Mise en attente de prestataire."""
+
     pass
 
 
 class StartTestSerializer(serializers.ModelSerializer):
     """Lancement du test (RB-TEST-001)."""
+
     class Meta:
         model = Panne
         fields = ("resultat_test",)
@@ -169,12 +187,15 @@ class StartTestSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         panne = self.instance
         if panne.statut != Panne.Statut.EN_INTERVENTION:
-            raise serializers.ValidationError("Le test ne peut etre lance qu'en etat EN_INTERVENTION.")
+            raise serializers.ValidationError(
+                "Le test ne peut etre lance qu'en etat EN_INTERVENTION."
+            )
         return attrs
 
 
 class ClosePanneSerializer(serializers.Serializer):
     """Cloture — verification du test conforme (RB-CL-001)."""
+
     commentaire_cloture = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
@@ -184,6 +205,7 @@ class ClosePanneSerializer(serializers.Serializer):
             Panne.ResultatTest.SOUS_SURVEILLANCE,
         ):
             raise serializers.ValidationError(
-                "Impossible de cloturer : le test doit etre CONFORME ou SOUS_SURVEILLANCE (RB-CL-001)."
+                "Impossible de cloturer : le test doit etre CONFORME "
+                "ou SOUS_SURVEILLANCE (RB-CL-001)."
             )
         return attrs

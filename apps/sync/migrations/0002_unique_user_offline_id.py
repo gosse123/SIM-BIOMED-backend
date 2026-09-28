@@ -5,54 +5,65 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('sync', '0001_initial'),
+        ("sync", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='offlineoperation',
-            options={'ordering': ['-executed_at'], 'verbose_name': 'opération hors ligne', 'verbose_name_plural': 'opérations hors ligne'},
+            name="offlineoperation",
+            options={
+                "ordering": ["-executed_at"],
+                "verbose_name": "opération hors ligne",
+                "verbose_name_plural": "opérations hors ligne",
+            },
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='body',
-            field=models.JSONField(blank=True, null=True, verbose_name='Corps de la requête'),
+            model_name="offlineoperation",
+            name="body",
+            field=models.JSONField(blank=True, null=True, verbose_name="Corps de la requête"),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='method',
-            field=models.CharField(max_length=10, verbose_name='Méthode HTTP'),
+            model_name="offlineoperation",
+            name="method",
+            field=models.CharField(max_length=10, verbose_name="Méthode HTTP"),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='offline_id',
-            field=models.CharField(db_index=True, max_length=64, verbose_name='ID hors ligne (X-Offline-Id)'),
+            model_name="offlineoperation",
+            name="offline_id",
+            field=models.CharField(
+                db_index=True, max_length=64, verbose_name="ID hors ligne (X-Offline-Id)"
+            ),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='response_body',
-            field=models.JSONField(blank=True, null=True, verbose_name='Corps de la réponse'),
+            model_name="offlineoperation",
+            name="response_body",
+            field=models.JSONField(blank=True, null=True, verbose_name="Corps de la réponse"),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='response_status',
-            field=models.IntegerField(blank=True, null=True, verbose_name='HTTP status de la réponse'),
+            model_name="offlineoperation",
+            name="response_status",
+            field=models.IntegerField(
+                blank=True, null=True, verbose_name="HTTP status de la réponse"
+            ),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='statut',
-            field=models.CharField(choices=[('EN_COURS', 'En cours'), ('OK', 'Succès'), ('ERREUR', 'Erreur')], default='EN_COURS', max_length=15),
+            model_name="offlineoperation",
+            name="statut",
+            field=models.CharField(
+                choices=[("EN_COURS", "En cours"), ("OK", "Succès"), ("ERREUR", "Erreur")],
+                default="EN_COURS",
+                max_length=15,
+            ),
         ),
         migrations.AlterField(
-            model_name='offlineoperation',
-            name='url',
-            field=models.CharField(max_length=500, verbose_name='URL demandée'),
+            model_name="offlineoperation",
+            name="url",
+            field=models.CharField(max_length=500, verbose_name="URL demandée"),
         ),
         migrations.AlterUniqueTogether(
-            name='offlineoperation',
-            unique_together={('user', 'offline_id')},
+            name="offlineoperation",
+            unique_together={("user", "offline_id")},
         ),
     ]

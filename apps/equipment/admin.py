@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Equipment, Service, Localisation
+
+from .models import Equipment, Localisation, Service
 
 
 @admin.register(Service)

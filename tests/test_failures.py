@@ -1,9 +1,9 @@
 import pytest
 from rest_framework.test import APIClient
+
 from apps.accounts.models import User
-from apps.equipment.models import Equipment, Service, Localisation
+from apps.equipment.models import Equipment, Localisation, Service
 from apps.failures.models import Panne
-from django.core.exceptions import ValidationError
 
 
 @pytest.fixture
@@ -61,9 +61,11 @@ def panne_report_data(equipment):
 
 # --- Test transitions valides ---
 
+
 @pytest.mark.django_db
 def test_full_happy_path(api_client, biomed_user, panne_report_data):
-    """Test complet : Signaler → Qualifier → Criticité → Diagnostic → Intervention → Test → Clôturer."""
+    """Test complet : Signaler → Qualifier → Criticité → Diagnostic → Intervention
+    → Test → Clôturer."""
     api_client.force_authenticate(user=biomed_user)
 
     # 1. Signaler

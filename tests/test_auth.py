@@ -1,5 +1,6 @@
 import pytest
 from django.test import Client
+
 from apps.accounts.models import User
 
 
@@ -41,10 +42,14 @@ def test_register_weak_password(api_client, user_data):
 @pytest.mark.django_db
 def test_login_success(api_client, user_data):
     api_client.post("/api/auth/register/", user_data, content_type="application/json")
-    response = api_client.post("/api/auth/login/", {
-        "username": "tech_test",
-        "password": "SecurePass123!",
-    }, content_type="application/json")
+    response = api_client.post(
+        "/api/auth/login/",
+        {
+            "username": "tech_test",
+            "password": "SecurePass123!",
+        },
+        content_type="application/json",
+    )
     assert response.status_code == 200
     assert "access" in response.json()
 
@@ -52,20 +57,28 @@ def test_login_success(api_client, user_data):
 @pytest.mark.django_db
 def test_login_wrong_password(api_client, user_data):
     api_client.post("/api/auth/register/", user_data, content_type="application/json")
-    response = api_client.post("/api/auth/login/", {
-        "username": "tech_test",
-        "password": "WrongPassword",
-    }, content_type="application/json")
+    response = api_client.post(
+        "/api/auth/login/",
+        {
+            "username": "tech_test",
+            "password": "WrongPassword",
+        },
+        content_type="application/json",
+    )
     assert response.status_code == 400
 
 
 @pytest.mark.django_db
 def test_me_authenticated(api_client, user_data):
     api_client.post("/api/auth/register/", user_data, content_type="application/json")
-    login_response = api_client.post("/api/auth/login/", {
-        "username": "tech_test",
-        "password": "SecurePass123!",
-    }, content_type="application/json")
+    login_response = api_client.post(
+        "/api/auth/login/",
+        {
+            "username": "tech_test",
+            "password": "SecurePass123!",
+        },
+        content_type="application/json",
+    )
     token = login_response.json()["access"]
 
     response = api_client.get("/api/auth/me/", HTTP_AUTHORIZATION=f"Bearer {token}")

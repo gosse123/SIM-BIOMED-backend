@@ -1,9 +1,11 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
 from datetime import timedelta
+
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from .models import OfflineOperation
 
 
@@ -29,17 +31,20 @@ def sync_status(request):
         executed_at__gte=timezone.now() - timedelta(hours=24),
     ).count()
 
-    return Response({
-        "pending": pending,
-        "recent_ok_24h": recent_ok,
-        "recent_errors_24h": recent_errors,
-    })
+    return Response(
+        {
+            "pending": pending,
+            "recent_ok_24h": recent_ok,
+            "recent_errors_24h": recent_errors,
+        }
+    )
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def retry_failed(request):
-    """Supprime les operations en erreur des dernieres 24h pour permettre au client de les renvoyer."""
+    """Supprime les operations en erreur des dernieres 24h pour permettre au client
+    de les renvoyer."""
     if request.user.role != "ADMINISTRATEUR":
         return Response(
             {"detail": "Seuls les administrateurs peuvent relancer les operations."},
@@ -53,13 +58,13 @@ def retry_failed(request):
 
     # Collect info before deleting
     operations = [
-        {"offline_id": op.offline_id, "method": op.method, "url": op.url}
-        for op in failed
+        {"offline_id": op.offline_id, "method": op.method, "url": op.url} for op in failed
     ]
     count = failed.count()
 
     # Trace d'audit avant suppression des opérations (RB-AUD-001)
     from apps.audit.models import create_audit_log
+
     create_audit_log(
         utilisateur=request.user,
         action="sync.retry_failed",
@@ -72,8 +77,10 @@ def retry_failed(request):
     # Delete so the middleware won't block retries with the same X-Offline-Id
     failed.delete()
 
-    return Response({
-        "detail": f"{count} operation(s) supprimée(s). Le client peut maintenant les renvoyer.",
-        "count": count,
-        "operations": operations,
-    })
+    return Response(
+        {
+            "detail": f"{count} operation(s) supprimée(s). Le client peut maintenant les renvoyer.",
+            "count": count,
+            "operations": operations,
+        }
+    )

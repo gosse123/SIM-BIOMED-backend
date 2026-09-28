@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,25 +14,63 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='OfflineOperation',
+            name="OfflineOperation",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('offline_id', models.CharField(db_index=True, max_length=64, unique=True, verbose_name='ID hors ligne (X-Offline-Id)')),
-                ('method', models.CharField(max_length=10, verbose_name='HTTP method')),
-                ('url', models.CharField(max_length=500, verbose_name='URL demandee')),
-                ('body', models.JSONField(blank=True, null=True, verbose_name='Corps de la requete')),
-                ('statut', models.CharField(choices=[('EN_COURS', 'En cours'), ('OK', 'Succes'), ('ERREUR', 'Erreur')], default='EN_COURS', max_length=15)),
-                ('response_status', models.IntegerField(blank=True, null=True, verbose_name='HTTP status de la reponse')),
-                ('response_body', models.JSONField(blank=True, null=True, verbose_name='Corps de la reponse')),
-                ('error_message', models.TextField(blank=True, verbose_name="Message d'erreur")),
-                ('executed_at', models.DateTimeField(auto_now_add=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='offline_operations', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "offline_id",
+                    models.CharField(
+                        db_index=True,
+                        max_length=64,
+                        unique=True,
+                        verbose_name="ID hors ligne (X-Offline-Id)",
+                    ),
+                ),
+                ("method", models.CharField(max_length=10, verbose_name="HTTP method")),
+                ("url", models.CharField(max_length=500, verbose_name="URL demandee")),
+                (
+                    "body",
+                    models.JSONField(blank=True, null=True, verbose_name="Corps de la requete"),
+                ),
+                (
+                    "statut",
+                    models.CharField(
+                        choices=[("EN_COURS", "En cours"), ("OK", "Succes"), ("ERREUR", "Erreur")],
+                        default="EN_COURS",
+                        max_length=15,
+                    ),
+                ),
+                (
+                    "response_status",
+                    models.IntegerField(
+                        blank=True, null=True, verbose_name="HTTP status de la reponse"
+                    ),
+                ),
+                (
+                    "response_body",
+                    models.JSONField(blank=True, null=True, verbose_name="Corps de la reponse"),
+                ),
+                ("error_message", models.TextField(blank=True, verbose_name="Message d'erreur")),
+                ("executed_at", models.DateTimeField(auto_now_add=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="offline_operations",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'operation hors ligne',
-                'verbose_name_plural': 'operations hors ligne',
-                'ordering': ['-executed_at'],
+                "verbose_name": "operation hors ligne",
+                "verbose_name_plural": "operations hors ligne",
+                "ordering": ["-executed_at"],
             },
         ),
     ]

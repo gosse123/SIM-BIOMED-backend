@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Equipment, Service, Localisation
+
+from .models import Equipment, Localisation, Service
 
 
 class ServiceSerializer(serializers.ModelSerializer):

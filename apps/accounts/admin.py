@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Etablissement, DemandeAcces, Notification
+
+from .models import DemandeAcces, Etablissement, Notification, User
 
 
 @admin.register(User)
@@ -20,7 +21,14 @@ class EtablissementAdmin(admin.ModelAdmin):
 
 @admin.register(DemandeAcces)
 class DemandeAccesAdmin(admin.ModelAdmin):
-    list_display = ("nom_complet", "email", "role_souhaite", "statut", "date_creation", "traite_par")
+    list_display = (
+        "nom_complet",
+        "email",
+        "role_souhaite",
+        "statut",
+        "date_creation",
+        "traite_par",
+    )
     list_filter = ("statut", "role_souhaite")
     readonly_fields = ("date_creation", "date_traitement")
 

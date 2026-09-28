@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import Intervention
 
 
@@ -68,23 +69,41 @@ class CreateInterventionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Intervention
-        fields = ("panne", "equipement", "type_intervention", "description", "pieces_utilisees", "hors_service_total")
+        fields = (
+            "panne",
+            "equipement",
+            "type_intervention",
+            "description",
+            "pieces_utilisees",
+            "hors_service_total",
+        )
 
     def validate_equipement(self, value):
         from apps.equipment.models import Equipment
+
         if value.etat_operationnel == Equipment.StatutOperationnel.REFORME:
             raise serializers.ValidationError("Pas d'intervention sur un équipement réformé.")
         # Cloisonnement : pas d'intervention sur l'équipement d'un autre établissement
         request = self.context.get("request")
-        if request and request.user.etablissement_id and value.etablissement_id != request.user.etablissement_id:
-            raise serializers.ValidationError("Cet équipement n'appartient pas à votre établissement.")
+        if (
+            request
+            and request.user.etablissement_id
+            and value.etablissement_id != request.user.etablissement_id
+        ):
+            raise serializers.ValidationError(
+                "Cet équipement n'appartient pas à votre établissement."
+            )
         return value
 
     def validate_panne(self, value):
         # Cloisonnement identique sur la panne liée éventuelle
         request = self.context.get("request")
-        if value and request and request.user.etablissement_id \
-                and value.equipement.etablissement_id != request.user.etablissement_id:
+        if (
+            value
+            and request
+            and request.user.etablissement_id
+            and value.equipement.etablissement_id != request.user.etablissement_id
+        ):
             raise serializers.ValidationError("Cette panne n'appartient pas à votre établissement.")
         return value
 

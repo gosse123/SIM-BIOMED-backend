@@ -52,9 +52,7 @@ class User(AbstractUser):
         choices=Role.choices,
         default=Role.PERSONNEL_SOIGNANT,
     )
-    matricule = models.CharField(
-        max_length=50, blank=True, verbose_name="Matricule hospitalier"
-    )
+    matricule = models.CharField(max_length=50, blank=True, verbose_name="Matricule hospitalier")
     etablissement = models.ForeignKey(
         Etablissement,
         on_delete=models.PROTECT,
@@ -89,7 +87,11 @@ class DemandeAcces(models.Model):
     email = models.EmailField(unique=True, verbose_name="Email professionnel")
     role_souhaite = models.CharField(
         max_length=30,
-        choices=[(r, l) for r, l in User.Role.choices if r not in (User.Role.ADMINISTRATEUR, User.Role.RESPONSABLE_BIOMEDICAL)],
+        choices=[
+            (r, label)
+            for r, label in User.Role.choices
+            if r not in (User.Role.ADMINISTRATEUR, User.Role.RESPONSABLE_BIOMEDICAL)
+        ],
         verbose_name="Rôle souhaité",
     )
     justification = models.TextField(verbose_name="Justification de la demande")
@@ -146,7 +148,9 @@ class DemandeAcces(models.Model):
             username=username,
             email=self.email,
             first_name=self.nom_complet.split()[0] if self.nom_complet.split() else "",
-            last_name=" ".join(self.nom_complet.split()[1:]) if len(self.nom_complet.split()) > 1 else "",
+            last_name=" ".join(self.nom_complet.split()[1:])
+            if len(self.nom_complet.split()) > 1
+            else "",
             role=self.role_souhaite,
             etablissement=etab,
             is_active=True,

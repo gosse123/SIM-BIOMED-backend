@@ -1,4 +1,5 @@
 from django.db import models
+
 from apps.accounts.models import User
 
 
@@ -17,9 +18,7 @@ class OfflineOperation(models.Model):
         db_index=True,
         verbose_name="ID hors ligne (X-Offline-Id)",
     )
-    user = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="offline_operations"
-    )
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="offline_operations")
     method = models.CharField(max_length=10, verbose_name="Méthode HTTP")
     url = models.CharField(max_length=500, verbose_name="URL demandée")
     body = models.JSONField(null=True, blank=True, verbose_name="Corps de la requête")
@@ -31,9 +30,7 @@ class OfflineOperation(models.Model):
     response_status = models.IntegerField(
         null=True, blank=True, verbose_name="HTTP status de la réponse"
     )
-    response_body = models.JSONField(
-        null=True, blank=True, verbose_name="Corps de la réponse"
-    )
+    response_body = models.JSONField(null=True, blank=True, verbose_name="Corps de la réponse")
     error_message = models.TextField(blank=True, verbose_name="Message d'erreur")
     executed_at = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)

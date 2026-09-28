@@ -24,17 +24,17 @@ TRANSITIONS_AUTORISEES = {
 }
 
 
-class TransitionInvalide(ValueError):
+class TransitionInvalideError(ValueError):
     """Transition de statut non autorisée (RB-004)."""
 
 
 def verifier_transition(ancien_statut: str, nouveau_statut: str) -> None:
-    """Lève TransitionInvalide si la transition n'est pas déclarée.
+    """Lève TransitionInvalideError si la transition n'est pas déclarée.
 
     RB-CL-001 : CLOSE exige EN_TEST (donc un test réalisé) — garanti par la
     carte des transitions, pas seulement par les vues.
     """
     if nouveau_statut not in TRANSITIONS_AUTORISEES.get(ancien_statut, set()):
-        raise TransitionInvalide(
+        raise TransitionInvalideError(
             f"Transition non autorisée : {ancien_statut} → {nouveau_statut}"
         )

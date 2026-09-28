@@ -1,4 +1,5 @@
 import os
+
 from celery import Celery
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
@@ -14,7 +15,9 @@ app.conf.beat_schedule = {
     },
     "generate-preventive-schedule-monthly": {
         "task": "apps.preventive.tasks.generate_preventive_schedule",
-        "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(day_of_month=1, hour=7, minute=0),
+        "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
+            day_of_month=1, hour=7, minute=0
+        ),
     },
 }
 

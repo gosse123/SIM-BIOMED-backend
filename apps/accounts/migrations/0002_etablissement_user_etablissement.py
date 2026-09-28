@@ -5,29 +5,40 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0001_initial'),
+        ("accounts", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Etablissement',
+            name="Etablissement",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nom', models.CharField(max_length=300, unique=True)),
-                ('adresse', models.TextField(blank=True)),
-                ('actif', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("nom", models.CharField(max_length=300, unique=True)),
+                ("adresse", models.TextField(blank=True)),
+                ("actif", models.BooleanField(default=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'verbose_name': 'établissement',
-                'verbose_name_plural': 'établissements',
+                "verbose_name": "établissement",
+                "verbose_name_plural": "établissements",
             },
         ),
         migrations.AddField(
-            model_name='user',
-            name='etablissement',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='utilisateurs', to='accounts.etablissement', verbose_name='Établissement'),
+            model_name="user",
+            name="etablissement",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="utilisateurs",
+                to="accounts.etablissement",
+                verbose_name="Établissement",
+            ),
         ),
     ]

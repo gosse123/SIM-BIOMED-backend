@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -27,6 +27,8 @@ urlpatterns = [
     path("demandes/<int:pk>/reject/", views.reject_demande_view, name="demande_reject"),
     path("notifications/", views.notifications_list_view, name="notifications_list"),
     path("notifications/<int:pk>/read/", views.notification_read_view, name="notification_read"),
-    path("notifications/read-all/", views.notifications_read_all_view, name="notifications_read_all"),
+    path(
+        "notifications/read-all/", views.notifications_read_all_view, name="notifications_read_all"
+    ),
     path("", include(router.urls)),
 ]

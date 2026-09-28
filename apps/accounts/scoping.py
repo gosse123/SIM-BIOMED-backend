@@ -6,6 +6,7 @@ que les données de son établissement. Un utilisateur sans établissement
 initial d'un nouvel établissement.
 """
 
+
 def scope_to_etablissement(queryset, user, champ="equipement__etablissement"):
     """Filtre un queryset sur l'établissement de l'utilisateur.
 
