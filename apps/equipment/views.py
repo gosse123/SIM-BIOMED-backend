@@ -1,5 +1,5 @@
 from rest_framework import filters, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 
 from apps.accounts.permissions import CanManageEquipment
 from apps.accounts.scoping import scope_to_etablissement
@@ -22,6 +22,13 @@ class ServiceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, CanManageEquipment]
     pagination_class = None
 
+    def get_permissions(self):
+        # RB-SEC-002 : consultation ouverte (y compris pour signaler une
+        # panne ou créer une intervention), gestion réservée ADMIN/RESP.
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), CanManageEquipment()]
+
     def get_queryset(self):
         return scope_to_etablissement(
             Service.objects.all(), self.request.user, champ="etablissement"
@@ -38,6 +45,11 @@ class LocalisationViewSet(viewsets.ModelViewSet):
     serializer_class = LocalisationSerializer
     permission_classes = [IsAuthenticated, CanManageEquipment]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), CanManageEquipment()]
 
     def get_queryset(self):
         return scope_to_etablissement(
@@ -56,6 +68,14 @@ class EquipmentViewSet(viewsets.ModelViewSet):
     search_fields = ["num_inventaire", "nom", "num_serie", "marque", "modele"]
     ordering_fields = ["created_at", "nom", "num_inventaire", "etat_operationnel"]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        # RB-SEC-002 : consultation ouverte (tous les rôles métier ont
+        # besoin du parc — signalement, intervention, indicateurs),
+        # écriture réservée ADMIN/RESP.
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), CanManageEquipment()]
 
     def get_queryset(self):
         qs = Equipment.objects.select_related("service", "localisation").all()

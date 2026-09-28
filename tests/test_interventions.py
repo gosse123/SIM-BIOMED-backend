@@ -268,3 +268,167 @@ def test_list_interventions_priorisee_par_criticite(api_client, biomed_user, equ
     resp = api_client.get("/api/interventions/")
     results = resp.json()
     assert results[0]["panne_id"] == panne_critique.id
+
+
+# --- Machine à états, RB-SEC-003 et synchronisation équipement ---
+
+
+@pytest.fixture
+def tech_user():
+    return User.objects.create_user(
+        username="tech_int",
+        password="TechPass123!",
+        role=User.Role.TECHNICIEN,
+    )
+
+
+@pytest.mark.django_db
+def test_technicien_peut_executer_intervention(api_client, tech_user, equipment, panne):
+    """RB-SEC-003 : le technicien exécute (consulter, créer, démarrer, terminer)."""
+    api_client.force_authenticate(user=tech_user)
+    assert api_client.get("/api/interventions/").status_code == 200
+
+    intervention = _quick_intervention(api_client, equipment, panne)
+    resp = api_client.post(f"/api/interventions/{intervention.id}/start/", {}, format="json")
+    assert resp.status_code == 200
+    resp = api_client.post(
+        f"/api/interventions/{intervention.id}/finish/",
+        {"temps_passe_minutes": 45},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["statut"] == "TERMINEE"
+
+
+@pytest.mark.django_db
+def test_technicien_ne_peut_pas_supprimer(api_client, tech_user, equipment, panne):
+    """La suppression reste un acte de gestion (ADMIN/RESP)."""
+    api_client.force_authenticate(user=tech_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    resp = api_client.delete(f"/api/interventions/{intervention.id}/")
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_suppression_laisse_trace_audit(api_client, biomed_user, equipment, panne):
+    """RB-AUD-001 : toute action importante laisse une trace."""
+    from apps.audit.models import AuditLog
+
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    resp = api_client.delete(f"/api/interventions/{intervention.id}/")
+    assert resp.status_code == 204
+    assert AuditLog.objects.filter(
+        action="intervention.delete", entite_id=intervention.id
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_annulation_planifiee(api_client, biomed_user, equipment, panne):
+    """RB-004 : PLANIFIEE → ANNULEE via l'endpoint dédié."""
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    resp = api_client.post(f"/api/interventions/{intervention.id}/cancel/", {}, format="json")
+    assert resp.status_code == 200
+    assert resp.json()["statut"] == "ANNULEE"
+
+    # Terminal : plus aucune transition
+    resp = api_client.post(f"/api/interventions/{intervention.id}/start/", {}, format="json")
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_annulation_apres_fin_rejetee(api_client, biomed_user, equipment, panne):
+    """RB-IN-001 : une intervention terminée ne peut plus être annulée."""
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    api_client.post(f"/api/interventions/{intervention.id}/start/", {}, format="json")
+    api_client.post(
+        f"/api/interventions/{intervention.id}/finish/", {}, format="json"
+    )
+    resp = api_client.post(f"/api/interventions/{intervention.id}/cancel/", {}, format="json")
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_start_met_equipement_en_maintenance(api_client, biomed_user, equipment, panne):
+    """RB-CL-002 : démarrage → équipement EN_MAINTENANCE."""
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    api_client.post(f"/api/interventions/{intervention.id}/start/", {}, format="json")
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.EN_MAINTENANCE
+
+
+@pytest.mark.django_db
+def test_finish_partiel_avec_panne_retour_en_panne(
+    api_client, biomed_user, equipment, panne
+):
+    """Réparation partielle : retour EN_PANNE jusqu'au test (RB-CL-001)."""
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    api_client.post(f"/api/interventions/{intervention.id}/start/", {}, format="json")
+    resp = api_client.post(
+        f"/api/interventions/{intervention.id}/finish/",
+        {"repare_totalement": False},
+        format="json",
+    )
+    assert resp.status_code == 200
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.EN_PANNE
+
+
+@pytest.mark.django_db
+def test_patch_statut_intervention_ignore(api_client, biomed_user, equipment, panne):
+    """RB-004 : le statut ne change pas par PATCH libre."""
+    api_client.force_authenticate(user=biomed_user)
+    intervention = _quick_intervention(api_client, equipment, panne)
+    resp = api_client.patch(
+        f"/api/interventions/{intervention.id}/",
+        {"statut": "TERMINEE"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    intervention.refresh_from_db()
+    assert intervention.statut == Intervention.StatutIntervention.PLANIFIEE
+
+
+@pytest.mark.django_db
+def test_create_panne_d_autre_equipement_rejetee(api_client, biomed_user, equipment, panne):
+    """Cohérence : la panne liée doit porter sur l'équipement de l'intervention."""
+    autre = Equipment.objects.create(
+        num_inventaire="INV-TEST-AUTRE",
+        nom="Doppler",
+        type_equipement="ECHO",
+        categorie="Imagerie",
+        marque="GE",
+        modele="Vivid",
+        num_serie="SN-AUTRE",
+        service=equipment.service,
+        localisation=equipment.localisation,
+    )
+    api_client.force_authenticate(user=biomed_user)
+    resp = api_client.post(
+        "/api/interventions/",
+        {
+            "equipement": autre.id,
+            "panne": panne.id,
+            "type_intervention": "CORRECTIVE",
+            "description": "Cohérence",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.django_db
+def test_technicien_consulte_mais_ne_gere_pas_equipement(api_client, tech_user):
+    """RB-SEC-002 : consultation ouverte, écriture réservée ADMIN/RESP."""
+    api_client.force_authenticate(user=tech_user)
+    assert api_client.get("/api/equipment/").status_code == 200
+    resp = api_client.post(
+        "/api/equipment/",
+        {"num_inventaire": "INV-X", "nom": "Test", "type_equipement": "autre"},
+        format="json",
+    )
+    assert resp.status_code == 403

@@ -55,6 +55,17 @@ class InterventionDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+        # RB-IN-001 : statut et dates ne changent que par les endpoints de
+        # transition (start/finish/cancel) ; équipement et panne sont
+        # immuables après création pour garder la cohérence métier.
+        read_only_fields = (
+            "equipement",
+            "panne",
+            "statut",
+            "date_debut",
+            "date_fin",
+            "realisee_par",
+        )
 
     def get_realisee_par_nom(self, obj):
         if obj.realisee_par:
@@ -106,6 +117,24 @@ class CreateInterventionSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError("Cette panne n'appartient pas à votre établissement.")
         return value
+
+    def validate(self, attrs):
+        # Cohérence métier : la panne doit porter sur l'équipement de
+        # l'intervention et ne pas être déjà clôturée (RB-CL-001).
+        panne = attrs.get("panne")
+        equipement = attrs.get("equipement")
+        if panne and equipement:
+            if panne.equipement_id != equipement.id:
+                raise serializers.ValidationError(
+                    "La panne liée ne porte pas sur cet équipement."
+                )
+            from apps.failures.models import Panne
+
+            if panne.statut == Panne.Statut.CLOSE:
+                raise serializers.ValidationError(
+                    "Impossible de lier une intervention à une panne clôturée."
+                )
+        return attrs
 
 
 class StartInterventionSerializer(serializers.Serializer):
