@@ -19,7 +19,9 @@ TRANSITIONS_AUTORISEES = {
     # diagnostic ou l'intervention, et la reprise ramène à l'intervention.
     "EN_ATTENTE_PIECE": {"EN_INTERVENTION"},
     "EN_ATTENTE_PRESTATAIRE": {"EN_INTERVENTION"},
-    "EN_TEST": {"CLOSE"},
+    # Retours depuis le test (03-etats-panne.puml) : NON_CONFORME /
+    # TOUJOURS_EN_PANNE → diagnostic ; réparation impossible → attente.
+    "EN_TEST": {"CLOSE", "EN_DIAGNOSTIC", "EN_ATTENTE_PIECE", "EN_ATTENTE_PRESTATAIRE"},
     "CLOSE": set(),
 }
 

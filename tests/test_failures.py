@@ -63,15 +63,17 @@ def panne_report_data(equipment):
 
 
 @pytest.mark.django_db
-def test_full_happy_path(api_client, biomed_user, panne_report_data):
+def test_full_happy_path(api_client, biomed_user, equipment, panne_report_data):
     """Test complet : Signaler → Qualifier → Criticité → Diagnostic → Intervention
-    → Test → Clôturer."""
+    → Test → Clôturer, avec synchronisation du statut opérationnel (RB-CL-002)."""
     api_client.force_authenticate(user=biomed_user)
 
     # 1. Signaler
     resp = api_client.post("/api/pannes/", panne_report_data, format="json")
     assert resp.status_code == 201
     panne_id = resp.json()["id"]
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.EN_PANNE
 
     # 2. Qualifier
     resp = api_client.post(
@@ -105,6 +107,8 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     resp = api_client.post(f"/api/pannes/{panne_id}/start-intervention/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_INTERVENTION"
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.EN_MAINTENANCE
 
     # 6. Test
     resp = api_client.post(
@@ -124,6 +128,8 @@ def test_full_happy_path(api_client, biomed_user, panne_report_data):
     assert resp.status_code == 200
     assert resp.json()["statut"] == "CLOSE"
     assert resp.json()["date_cloture"] is not None
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.FONCTIONNEL
 
 
 @pytest.mark.django_db
@@ -193,11 +199,18 @@ def test_wait_piece_then_resume(api_client, biomed_user, equipment):
     resp = api_client.post(f"/api/pannes/{panne.id}/wait-piece/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_ATTENTE_PIECE"
+    equipment.refresh_from_db()
+    assert (
+        equipment.etat_operationnel
+        == Equipment.StatutOperationnel.EN_ATTENTE_PIECE_OU_PRESTATAIRE
+    )
 
     # Attente piece → Intervention
     resp = api_client.post(f"/api/pannes/{panne.id}/start-intervention/", {}, format="json")
     assert resp.status_code == 200
     assert resp.json()["statut"] == "EN_INTERVENTION"
+    equipment.refresh_from_db()
+    assert equipment.etat_operationnel == Equipment.StatutOperationnel.EN_MAINTENANCE
 
 
 @pytest.mark.django_db
@@ -207,3 +220,44 @@ def test_list_pannes(api_client, biomed_user, panne_report_data):
     resp = api_client.get("/api/pannes/")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
+
+
+# --- Verrous et synchronisation ---
+
+
+@pytest.mark.django_db
+def test_patch_statut_panne_ignore(api_client, biomed_user, equipment):
+    """RB-004 / RB-CL-001 : le statut et le résultat de test ne changent
+    jamais par PATCH libre, seulement par les endpoints de transition."""
+    api_client.force_authenticate(user=biomed_user)
+    panne = Panne.objects.create(
+        equipement=equipment,
+        signale_par=biomed_user,
+        description_signalement="Test",
+        statut=Panne.Statut.SIGNALEE,
+        resultat_test=Panne.ResultatTest.NON_CONFORME,
+    )
+    resp = api_client.patch(
+        f"/api/pannes/{panne.id}/",
+        {"statut": "CLOSE", "resultat_test": "CONFORME"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    panne.refresh_from_db()
+    assert panne.statut == Panne.Statut.SIGNALEE
+    assert panne.resultat_test == Panne.ResultatTest.NON_CONFORME
+
+
+def test_carte_transitions_en_test_alignee_doc():
+    """03-etats-panne.puml : depuis EN_TEST, retour diagnostic/attente ou CLOSE."""
+    from domain.failure.transitions import TransitionInvalideError, verifier_transition
+
+    transitions_en_test = Panne.TRANSITIONS_VALIDES[Panne.Statut.EN_TEST]
+    assert Panne.Statut.CLOSE in transitions_en_test
+    assert Panne.Statut.EN_DIAGNOSTIC in transitions_en_test
+    assert Panne.Statut.EN_ATTENTE_PIECE in transitions_en_test
+    assert Panne.Statut.EN_ATTENTE_PRESTATAIRE in transitions_en_test
+
+    verifier_transition("EN_TEST", "EN_DIAGNOSTIC")  # autorisée
+    with pytest.raises(TransitionInvalideError):
+        verifier_transition("QUALIFIEE", "CLOSE")  # RB-CL-001 : saut interdit

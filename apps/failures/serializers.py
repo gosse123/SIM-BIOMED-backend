@@ -21,6 +21,7 @@ class PanneListSerializer(serializers.ModelSerializer):
             "statut",
             "niveau_criticite",
             "date_signalement",
+            "description_signalement",
             "signale_par",
             "signale_par_nom",
             "resultat_test",
@@ -68,10 +69,22 @@ class PanneDetailSerializer(serializers.ModelSerializer):
             "cloturee_par",
             "cloturee_par_detail",
             "commentaire_cloture",
+            "affecte_a",
+            "affecte_a_nom",
             "created_at",
             "updated_at",
             "transitions_valides",
         )
+        # RB-004 / RB-CL-001 : statut et résultat de test ne changent que
+        # par les endpoints de transition dédiés, jamais par PATCH libre.
+        read_only_fields = ("statut", "resultat_test")
+
+    affecte_a_nom = serializers.SerializerMethodField()
+
+    def get_affecte_a_nom(self, obj):
+        if not obj.affecte_a:
+            return None
+        return obj.affecte_a.get_full_name().strip() or obj.affecte_a.username
 
     def get_transitions_valides(self, obj):
         return [t.value for t in Panne.TRANSITIONS_VALIDES.get(obj.statut, [])]

@@ -3,6 +3,7 @@ from django.db import models
 
 from apps.accounts.models import User
 from apps.equipment.models import Equipment
+from domain.failure.transitions import TRANSITIONS_AUTORISEES
 
 
 class Panne(models.Model):
@@ -31,27 +32,10 @@ class Panne(models.Model):
         NON_CONFORME = "NON_CONFORME", "Non conforme"
         TOUJOURS_EN_PANNE = "TOUJOURS_EN_PANNE", "Toujours en panne"
 
-    # Transitions valides par statut
-    TRANSITIONS_VALIDES = {
-        Statut.SIGNALEE: [Statut.QUALIFIEE],
-        Statut.QUALIFIEE: [Statut.CLOSE, Statut.CRITICITE_EVALUEE],
-        Statut.CRITICITE_EVALUEE: [Statut.EN_DIAGNOSTIC],
-        Statut.EN_DIAGNOSTIC: [
-            Statut.EN_INTERVENTION,
-            Statut.EN_ATTENTE_PIECE,
-            Statut.EN_ATTENTE_PRESTATAIRE,
-        ],
-        Statut.EN_INTERVENTION: [Statut.EN_TEST],
-        Statut.EN_TEST: [
-            Statut.CLOSE,
-            Statut.EN_INTERVENTION,
-            Statut.EN_ATTENTE_PIECE,
-            Statut.EN_ATTENTE_PRESTATAIRE,
-        ],
-        Statut.EN_ATTENTE_PIECE: [Statut.EN_INTERVENTION],
-        Statut.EN_ATTENTE_PRESTATAIRE: [Statut.EN_INTERVENTION],
-        Statut.CLOSE: [],
-    }
+    # Transitions valides par statut — source unique : couche domaine (RB-004).
+    # Voir plus bas : dérivation de TRANSITIONS_AUTORISEES hors compréhension.
+
+    TRANSITIONS_VALIDES: dict = {}
 
     # Équipement
     equipement = models.ForeignKey(Equipment, on_delete=models.PROTECT, related_name="pannes")
@@ -87,6 +71,16 @@ class Panne(models.Model):
         max_length=20,
         choices=CriticitePanne.choices,
         default=CriticitePanne.MOYEN,
+    )
+
+    # Affectation / prise en charge (file de travail — RB-PR-004)
+    affecte_a = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pannes_affectees",
+        verbose_name="Affectée à",
     )
 
     # Diagnostic (RB-DIAG-001 : diagnostic obligatoire avant intervention)
@@ -136,3 +130,11 @@ class Panne(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+
+# Dérivation de la carte de transitions depuis la couche domaine — source
+# unique (RB-004), hors compréhension de classe.
+Panne.TRANSITIONS_VALIDES = {
+    Panne.Statut(statut): [Panne.Statut(cible) for cible in sorted(cibles)]
+    for statut, cibles in TRANSITIONS_AUTORISEES.items()
+}

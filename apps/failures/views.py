@@ -5,10 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts.models import User
 from apps.accounts.permissions import (
     CanCloseFailure,
     CanDiagnoseFailure,
     CanEvaluateCriticite,
+    CanManageIntervention,
     CanManageWaitState,
     CanQualifyFailure,
     CanReportFailure,
@@ -17,6 +19,7 @@ from apps.accounts.permissions import (
 )
 from apps.accounts.scoping import scope_to_etablissement
 from apps.audit.models import create_audit_log
+from apps.equipment.status import synchroniser_statut
 from domain.failure.transitions import TransitionInvalideError, verifier_transition
 
 from .models import Panne
@@ -89,6 +92,8 @@ class PanneViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), CanStartTest()]
         if self.action == "close":
             return [IsAuthenticated(), CanCloseFailure()]
+        if self.action == "affecter":
+            return [IsAuthenticated(), CanManageIntervention()]
         return [IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
@@ -107,7 +112,49 @@ class PanneViewSet(viewsets.ModelViewSet):
                 "statut": panne.statut,
             },
         )
+        # RB-CL-002 : équipement fonctionnel signalé en panne → EN_PANNE.
+        synchroniser_statut(
+            panne.equipement,
+            "EN_PANNE",
+            request.user,
+            f"Panne #{panne.id} signalée",
+        )
         return Response(PanneDetailSerializer(panne).data, status=status.HTTP_201_CREATED)
+
+    def perform_update(self, serializer):
+        """Mise à jour classique avec trace d'audit (RB-AUD-001)."""
+        ancienne = {k: str(v) for k, v in serializer.validated_data.items()}
+        panne = serializer.save()
+        create_audit_log(
+            utilisateur=self.request.user,
+            action="panne.update",
+            entite="Panne",
+            entite_id=panne.id,
+            ancienne_valeur=ancienne,
+            nouvelle_valeur={k: str(getattr(panne, k)) for k in ancienne},
+        )
+
+    @staticmethod
+    def _synchroniser_equipement(request, panne, new_statut):
+        """Le statut opérationnel suit le cycle de vie de la panne."""
+        cible = {
+            Panne.Statut.EN_INTERVENTION: "EN_MAINTENANCE",
+            Panne.Statut.EN_ATTENTE_PIECE: "EN_ATTENTE_PIECE_OU_PRESTATAIRE",
+            Panne.Statut.EN_ATTENTE_PRESTATAIRE: "EN_ATTENTE_PIECE_OU_PRESTATAIRE",
+        }.get(new_statut)
+        if cible is None and new_statut == Panne.Statut.CLOSE:
+            cible = (
+                "FONCTIONNEL"
+                if panne.resultat_test == Panne.ResultatTest.CONFORME
+                else "FONCTIONNEL_SOUS_SURVEILLANCE"
+            )
+        if cible:
+            synchroniser_statut(
+                panne.equipement,
+                cible,
+                request.user,
+                f"Panne #{panne.id} → {new_statut}",
+            )
 
     def perform_transition(
         self, request, panne_id, new_statut, serializer_class, audit_action, **extra_fields
@@ -149,6 +196,7 @@ class PanneViewSet(viewsets.ModelViewSet):
             ancienne_valeur={"statut": ancien_statut},
             nouvelle_valeur={"statut": panne.statut},
         )
+        self._synchroniser_equipement(request, panne, panne.statut)
         return Response(PanneDetailSerializer(panne).data)
 
     @action(detail=True, methods=["post"], url_path="evaluate-criticite")
@@ -245,3 +293,60 @@ class PanneViewSet(viewsets.ModelViewSet):
             date_cloture=timezone.now(),
             commentaire_cloture=request.data.get("commentaire_cloture", ""),
         )
+
+    @action(detail=True, methods=["post"], url_path="affecter")
+    def affecter(self, request, pk=None):
+        """Affecter la panne à un technicien (prise en charge — RB-PR-004).
+
+        Corps vide : prise en charge par l'utilisateur courant.
+        {"utilisateur": null} : désaffecter.
+        {"utilisateur": <id>} : affecter à un pair.
+        """
+        try:
+            panne = scope_to_etablissement(
+                Panne.objects.select_related("equipement", "affecte_a"), request.user
+            ).get(pk=pk)
+        except Panne.DoesNotExist:
+            return Response({"detail": "Panne introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+        if "utilisateur" in request.data and request.data["utilisateur"] in (None, "", "null"):
+            cible = None
+        elif "utilisateur" not in request.data:
+            cible = request.user
+        else:
+            try:
+                cible = User.objects.get(pk=request.data["utilisateur"])
+            except (User.DoesNotExist, ValueError, TypeError):
+                return Response(
+                    {"detail": "Utilisateur introuvable."}, status=status.HTTP_400_BAD_REQUEST
+                )
+            if (
+                request.user.etablissement_id
+                and cible.etablissement_id != request.user.etablissement_id
+            ):
+                return Response(
+                    {"detail": "Cet utilisateur n'appartient pas à votre établissement."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if cible.role not in (
+                User.Role.TECHNICIEN,
+                User.Role.RESPONSABLE_BIOMEDICAL,
+                User.Role.ADMINISTRATEUR,
+            ):
+                return Response(
+                    {"detail": "Seuls les techniciens et responsables peuvent être affectés."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        ancien = panne.affecte_a_id
+        panne.affecte_a = cible
+        panne.save(update_fields=["affecte_a", "updated_at"])
+        create_audit_log(
+            utilisateur=request.user,
+            action="panne.affecter",
+            entite="Panne",
+            entite_id=panne.id,
+            ancienne_valeur={"affecte_a": ancien},
+            nouvelle_valeur={"affecte_a": panne.affecte_a_id},
+        )
+        return Response(PanneDetailSerializer(panne).data)
