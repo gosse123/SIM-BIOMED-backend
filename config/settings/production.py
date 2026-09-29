@@ -1,25 +1,29 @@
 import os
 
 from .base import *  # noqa: F401, F403
+from .origins import allowed_hosts, cors_origins, csrf_origins
 
 DEBUG = False
 
 # Security: SECRET_KEY must be set in env
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")  # noqa: F405
+# Hôtes et origines réels : voir config.settings.origins (suffixe Render,
+# origine du front indispensable pour éviter le 403 CSRF).
+render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+frontend_origin = os.environ.get("FRONTEND_ORIGIN", "").strip()
+
+ALLOWED_HOSTS = allowed_hosts(os.environ.get("ALLOWED_HOSTS", ""), render_host)  # noqa: F405
 
 # CORS
-CORS_ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")  # noqa: F405
-    if o.strip()
-]
+CORS_ALLOWED_ORIGINS = cors_origins(  # noqa: F405
+    os.environ.get("CORS_ALLOWED_ORIGINS", ""), frontend_origin
+)
 
 # CSRF
-CSRF_TRUSTED_ORIGINS = [
-    o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
-]
+CSRF_TRUSTED_ORIGINS = csrf_origins(  # noqa: F405
+    os.environ.get("CSRF_TRUSTED_ORIGINS", ""), render_host, frontend_origin
+)
 
 # WhiteNoise : sert les fichiers statiques (admin, collectstatic) sans Nginx
 MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa: F405
