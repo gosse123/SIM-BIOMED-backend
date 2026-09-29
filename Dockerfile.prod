@@ -1,0 +1,41 @@
+# Image de production — multi-étapes, immutable, non-root.
+# Build : docker build -f Dockerfile.prod -t simbiomed-api .
+# Le port écouté vient de $PORT (Render, Railway, …), 8000 par défaut.
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    DJANGO_SETTINGS_MODULE=config.settings.production
+
+RUN useradd --create-home --uid 10001 appuser
+
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+COPY . .
+RUN chmod +x docker-entrypoint.sh && chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import os,urllib.request;urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/healthz/', headers={'X-Forwarded-Proto': 'https'}), timeout=4)"
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["sh", "-c", "gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 60 --graceful-timeout 30 --access-logfile - --error-logfile -"]

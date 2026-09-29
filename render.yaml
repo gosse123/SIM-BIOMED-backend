@@ -1,0 +1,99 @@
+# Blueprint Render — API SIM-BIOMED (backend Django/Gunicorn/Celery)
+# PostgreSQL est externe (Supabase ou équivalent) : renseigner DATABASE_URL
+# et REDIS_URL dans le dashboard Render (sync: false), jamais dans ce fichier.
+services:
+  - type: web
+    name: simbiomed-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile.prod
+    dockerContext: .
+    healthCheckPath: /api/healthz/
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: simbiomed-api.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://simbiomed-frontend.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://simbiomed-api.onrender.com
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: RUN_COLLECTSTATIC
+        value: "true"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: worker
+    name: simbiomed-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile.prod
+    dockerContext: .
+    startCommand: celery -A config worker --loglevel=info --concurrency=2
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: RUN_COLLECTSTATIC
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: worker
+    name: simbiomed-beat
+    runtime: docker
+    dockerfilePath: ./Dockerfile.prod
+    dockerContext: .
+    startCommand: celery -A config beat --loglevel=info
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: REDIS_URL
+        fromService:
+          name: simbiomed-api
+          type: web
+          envVarKey: REDIS_URL
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: RUN_COLLECTSTATIC
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
