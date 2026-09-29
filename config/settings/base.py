@@ -2,6 +2,11 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
+from dotenv import load_dotenv
+
+load_dotenv()
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-in-prod")
@@ -63,16 +68,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "simbiomed"),
-        "USER": os.environ.get("POSTGRES_USER", "simbiomed"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "simbiomed_dev"),
-        "HOST": os.environ.get("DB_HOST", "db"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+if DATABASE_URL:
+    # Base externe (Supabase, Railway, …) : un seul URL suffit.
+    # Paramètres acceptés dans l'URL : ?sslmode=require&connect_timeout=…
+    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "simbiomed"),
+            "USER": os.environ.get("POSTGRES_USER", "simbiomed"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "simbiomed_dev"),
+            "HOST": os.environ.get("DB_HOST", "db"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+        }
     }
-}
 
 AUTH_USER_MODEL = "accounts.User"
 

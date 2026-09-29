@@ -21,8 +21,12 @@ CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
 ]
 
-# HTTPS / HSTS
-SECURE_SSL_REDIRECT = True
+# WhiteNoise : sert les fichiers statiques (admin, collectstatic) sans Nginx
+MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")  # noqa: F405
+
+# HTTPS / HSTS (le TLS est terminé par le proxy de la plateforme)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "true").lower() == "true"
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -35,13 +39,17 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
 
 # Database
-DATABASES["default"]["HOST"] = os.environ.get("DB_HOST", "db")  # noqa: F405
-DATABASES["default"]["PORT"] = os.environ.get("DB_PORT", "5432")  # noqa: F405
+if not os.environ.get("DATABASE_URL", "").strip():  # noqa: F405
+    DATABASES["default"]["HOST"] = os.environ.get("DB_HOST", "db")  # noqa: F405
+    DATABASES["default"]["PORT"] = os.environ.get("DB_PORT", "5432")  # noqa: F405
 DATABASES["default"]["CONN_MAX_AGE"] = 600  # noqa: F405
 
 # Static files
 STATIC_ROOT = BASE_DIR / "staticfiles"  # noqa: F405
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 # Logging: structured JSON for production
 LOGGING = {
