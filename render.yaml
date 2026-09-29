@@ -1,15 +1,19 @@
 # Blueprint Render — API SIM-BIOMED (backend Django/Gunicorn/Celery)
-# PostgreSQL est externe (Supabase ou équivalent) : renseigner DATABASE_URL
-# et REDIS_URL dans le dashboard Render (sync: false), jamais dans ce fichier.
+# Tous les services sont en region: frankfurt, la même zone que le projet
+# Supabase (eu-west-2 / Londres) : ne pas changer la région, elle est
+# figée après la première création.
+# PostgreSQL est externe (Supabase) : renseigner DATABASE_URL dans le dashboard
+# Render (sync: false), jamais dans ce fichier — mode Pooler SESSION, ?sslmode=require.
 services:
   - type: web
     name: simbiomed-api
+    region: frankfurt
     runtime: docker
-    plan: starter
+    plan: 0.5c-512mb
     dockerfilePath: ./Dockerfile.prod
     dockerContext: .
     healthCheckPath: /api/healthz/
-    autoDeploy: true
+    autoDeployTrigger: 'commit'
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -17,14 +21,24 @@ services:
         generateValue: true
       - key: ALLOWED_HOSTS
         value: simbiomed-api.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
+      # Origine de l'interface : alimente CORS_ALLOWED_ORIGINS et
+      # CSRF_TRUSTED_ORIGINS (config.settings.origins). Le proxy nginx envoie
+      # Host = api alors que le navigateur vient du front : sans cette
+      # origine, Django refuse la comparaison Origin/Host (403 CSRF).
+      # Une seule variable à ajuster si Render suffixe le sous-domaine du front.
+      - key: FRONTEND_ORIGIN
         value: https://simbiomed-frontend.onrender.com
+      # Origine propre de l'API (repli hors Render) : RENDER_EXTERNAL_HOSTNAME,
+      # injecté par Render, complète automatiquement la liste si le nom est suffixé.
       - key: CSRF_TRUSTED_ORIGINS
         value: https://simbiomed-api.onrender.com
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
-        sync: false
+        fromService:
+          name: simbiomed-redis
+          type: keyvalue
+          property: connectionString
       - key: RUN_MIGRATIONS
         value: "true"
       - key: RUN_COLLECTSTATIC
@@ -36,11 +50,12 @@ services:
 
   - type: worker
     name: simbiomed-worker
+    region: frankfurt
     runtime: docker
     dockerfilePath: ./Dockerfile.prod
     dockerContext: .
     startCommand: celery -A config worker --loglevel=info --concurrency=2
-    autoDeploy: true
+    autoDeployTrigger: 'commit'
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -56,9 +71,9 @@ services:
           envVarKey: DATABASE_URL
       - key: REDIS_URL
         fromService:
-          name: simbiomed-api
-          type: web
-          envVarKey: REDIS_URL
+          name: simbiomed-redis
+          type: keyvalue
+          property: connectionString
       - key: RUN_MIGRATIONS
         value: "false"
       - key: RUN_COLLECTSTATIC
@@ -68,11 +83,12 @@ services:
 
   - type: worker
     name: simbiomed-beat
+    region: frankfurt
     runtime: docker
     dockerfilePath: ./Dockerfile.prod
     dockerContext: .
     startCommand: celery -A config beat --loglevel=info
-    autoDeploy: true
+    autoDeployTrigger: 'commit'
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -88,12 +104,23 @@ services:
           envVarKey: DATABASE_URL
       - key: REDIS_URL
         fromService:
-          name: simbiomed-api
-          type: web
-          envVarKey: REDIS_URL
+          name: simbiomed-redis
+          type: keyvalue
+          property: connectionString
       - key: RUN_MIGRATIONS
         value: "false"
       - key: RUN_COLLECTSTATIC
         value: "false"
       - key: LOG_LEVEL
         value: INFO
+
+  # Broker Celery : le worker et le beat ne peuvent pas démarrer sans lui.
+  # ipAllowList vide = connexions internes uniquement (réseau privé Render),
+  # ce qui impose la même région que les services. noeviction : une file de
+  # tâches ne doit jamais perdre un message par éviction.
+  - type: keyvalue
+    name: simbiomed-redis
+    region: frankfurt
+    plan: free
+    maxmemoryPolicy: noeviction
+    ipAllowList: []

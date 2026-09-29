@@ -11,12 +11,13 @@
 services:
   - type: web
     name: simbiomed-api
+    region: frankfurt
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile.prod
     dockerContext: .
     healthCheckPath: /api/healthz/
-    autoDeploy: true
+    autoDeployTrigger: 'commit'
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
@@ -24,11 +25,18 @@ services:
         generateValue: true
       - key: ALLOWED_HOSTS
         value: simbiomed-api.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
+      # Origine de l'interface : alimente CORS_ALLOWED_ORIGINS et
+      # CSRF_TRUSTED_ORIGINS (config.settings.origins). Le proxy nginx envoie
+      # Host = api alors que le navigateur vient du front : sans cette
+      # origine, Django refuse la comparaison Origin/Host (403 CSRF).
+      - key: FRONTEND_ORIGIN
         value: https://simbiomed-frontend.onrender.com
+      # Origine propre de l'API (repli hors Render) : RENDER_EXTERNAL_HOSTNAME,
+      # injecté par Render, complète automatiquement la liste si le nom est suffixé.
       - key: CSRF_TRUSTED_ORIGINS
         value: https://simbiomed-api.onrender.com
-      # Supabase : Settings → Database → Connection string (URI), mode Pooler,
+      # Supabase : Settings → Database → Connection string (URI), mode Pooler
+      # SESSION (jamais Transaction : casse les prepared statements de Django),
       # avec ?sslmode=require en suffixe. À saisir ici, jamais dans le dépôt.
       - key: DATABASE_URL
         sync: false
