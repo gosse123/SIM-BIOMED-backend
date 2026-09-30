@@ -4,7 +4,8 @@
 # Ce qui est sauté : les tâches Celery planifiées de preventive
 #   - check_overdue_maintenance (quotidien, 6 h)
 #   - generate_preventive_schedule (mensuel, le 1er à 7 h)
-# À déclencher à la main depuis la console du service :
+# Un service gratuit n'a pas de console : à déclencher depuis une machine
+# locale, avec DATABASE_URL pointant sur la base de production :
 #   python manage.py shell -c "from apps.preventive.tasks import check_overdue_maintenance as f; print(f())"
 #
 # Pour repasser en complet (worker + beat) : utiliser render.yaml.
@@ -23,18 +24,18 @@ services:
         value: config.settings.production
       - key: DJANGO_SECRET_KEY
         generateValue: true
-      - key: ALLOWED_HOSTS
-        value: simbiomed-api.onrender.com
+      # ALLOWED_HOSTS et CSRF_TRUSTED_ORIGINS ne sont pas déclarés ici :
+      # RENDER_EXTERNAL_HOSTNAME (injecté par Render, suffixé ou non) les
+      # renseigne à l'exécution via config/settings/origins.py. Valeur
+      # saisie dans ce fichier = sous-domaine deviné à l'avance = faux.
+      #
       # Origine de l'interface : alimente CORS_ALLOWED_ORIGINS et
-      # CSRF_TRUSTED_ORIGINS (config.settings.origins). Le proxy nginx envoie
-      # Host = api alors que le navigateur vient du front : sans cette
-      # origine, Django refuse la comparaison Origin/Host (403 CSRF).
+      # CSRF_TRUSTED_ORIGINS. Le proxy nginx envoie Host = api alors que le
+      # navigateur vient du front : sans cette origine, Django refuse la
+      # comparaison Origin/Host (403 CSRF). À corriger après la création du
+      # service frontend (sync: false = Render ne reprend pas la main dessus).
       - key: FRONTEND_ORIGIN
-        value: https://simbiomed-frontend.onrender.com
-      # Origine propre de l'API (repli hors Render) : RENDER_EXTERNAL_HOSTNAME,
-      # injecté par Render, complète automatiquement la liste si le nom est suffixé.
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://simbiomed-api.onrender.com
+        sync: false
       # Supabase : Settings → Database → Connection string (URI), mode Pooler
       # SESSION (jamais Transaction : casse les prepared statements de Django),
       # avec ?sslmode=require en suffixe. À saisir ici, jamais dans le dépôt.

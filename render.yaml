@@ -19,19 +19,17 @@ services:
         value: config.settings.production
       - key: DJANGO_SECRET_KEY
         generateValue: true
-      - key: ALLOWED_HOSTS
-        value: simbiomed-api.onrender.com
+      # ALLOWED_HOSTS et CSRF_TRUSTED_ORIGINS ne sont pas déclarés ici :
+      # RENDER_EXTERNAL_HOSTNAME (injecté par Render, suffixé ou non) les
+      # renseigne à l'exécution via config/settings/origins.py.
+      #
       # Origine de l'interface : alimente CORS_ALLOWED_ORIGINS et
-      # CSRF_TRUSTED_ORIGINS (config.settings.origins). Le proxy nginx envoie
-      # Host = api alors que le navigateur vient du front : sans cette
-      # origine, Django refuse la comparaison Origin/Host (403 CSRF).
-      # Une seule variable à ajuster si Render suffixe le sous-domaine du front.
+      # CSRF_TRUSTED_ORIGINS. Le proxy nginx envoie Host = api alors que le
+      # navigateur vient du front : sans cette origine, Django refuse la
+      # comparaison Origin/Host (403 CSRF). À corriger après la création du
+      # service frontend (sync: false = Render ne reprend pas la main dessus).
       - key: FRONTEND_ORIGIN
-        value: https://simbiomed-frontend.onrender.com
-      # Origine propre de l'API (repli hors Render) : RENDER_EXTERNAL_HOSTNAME,
-      # injecté par Render, complète automatiquement la liste si le nom est suffixé.
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://simbiomed-api.onrender.com
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
