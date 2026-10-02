@@ -10,6 +10,7 @@ from apps.accounts.permissions import (
     CanCloseFailure,
     CanDiagnoseFailure,
     CanEvaluateCriticite,
+    CanManageEquipment,
     CanManageIntervention,
     CanManageWaitState,
     CanQualifyFailure,
@@ -76,6 +77,10 @@ class PanneViewSet(viewsets.ModelViewSet):
         return PanneDetailSerializer
 
     def get_permissions(self):
+        if self.action in ("update", "partial_update"):
+            # Édition libre des champs : acte de gestion (RB-SEC-002), pas
+            # un simple rôle connecté (les transitions restent dédiées).
+            return [IsAuthenticated(), CanManageEquipment()]
         if self.action == "create":
             return [IsAuthenticated(), CanReportFailure()]
         if self.action == "qualify":

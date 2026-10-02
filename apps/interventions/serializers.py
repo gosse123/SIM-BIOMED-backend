@@ -27,7 +27,7 @@ class InterventionListSerializer(serializers.ModelSerializer):
 
     def get_realisee_par_nom(self, obj):
         if obj.realisee_par:
-            return f"{obj.realisee_par.first_name} {obj.realisee_par.last_name}"
+            return obj.realisee_par.get_full_name().strip() or obj.realisee_par.username
         return None
 
 
@@ -69,7 +69,7 @@ class InterventionDetailSerializer(serializers.ModelSerializer):
 
     def get_realisee_par_nom(self, obj):
         if obj.realisee_par:
-            return f"{obj.realisee_par.first_name} {obj.realisee_par.last_name}"
+            return obj.realisee_par.get_full_name().strip() or obj.realisee_par.username
         return None
 
 

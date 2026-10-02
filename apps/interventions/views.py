@@ -46,8 +46,11 @@ class InterventionViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     detail_serializer_class = InterventionDetailSerializer
 
     def get_permissions(self):
-        # RB-SEC-003 : exécution par technicien/responsable ; suppression
+        # RB-SEC-003 : lecture ouverte (cloisonnée par établissement) ;
+        # exécution par technicien/responsable ; suppression
         # réservée à la gestion (administrateur/responsable).
+        if self.action in ("list", "retrieve"):
+            return [IsAuthenticated()]
         if self.action == "destroy":
             return [IsAuthenticated(), CanManageEquipment()]
         return [IsAuthenticated(), CanManageIntervention()]

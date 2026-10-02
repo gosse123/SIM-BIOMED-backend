@@ -75,7 +75,8 @@ class WorkQueueView(APIView):
                     "statut": p.statut,
                     "niveau_criticite": p.niveau_criticite,
                     "date_signalement": p.date_signalement.isoformat(),
-                    "signale_par_nom": f"{p.signale_par.first_name} {p.signale_par.last_name}",
+                    "signale_par_nom": p.signale_par.get_full_name().strip()
+                    or p.signale_par.username,
                     "description_signalement": p.description_signalement[:100],
                     "cause_identifiee": (p.cause_identifiee or "")[:100],
                     # RB-004 : transitions calculées par le serveur, le

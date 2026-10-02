@@ -113,3 +113,52 @@ def test_cannot_finish_not_started(api_client, biomed_user, plan, equipment):
     mp_id = create_resp.json()["id"]
     resp = api_client.post(f"/api/maintenance-preventive/{mp_id}/finish/", {}, format="json")
     assert resp.status_code == 400
+
+
+# --- Contrôle d'accès (RB-SEC-002 / RB-SEC-003) ---
+
+
+@pytest.mark.django_db
+def test_consultation_preventive_ouverte_a_tous_les_roles(api_client, plan, equipment):
+    """Lecture préventive ouverte (cloisonnée), comme les autres listes."""
+    for username, role in (
+        ("tech_prev", User.Role.TECHNICIEN),
+        ("soignant_prev", User.Role.PERSONNEL_SOIGNANT),
+        ("dir_prev", User.Role.DIRECTION),
+    ):
+        user = User.objects.create_user(username=username, password="Pass1234!", role=role)
+        api_client.force_authenticate(user=user)
+        assert api_client.get("/api/maintenance-plans/").status_code == 200
+        assert api_client.get("/api/maintenance-preventive/").status_code == 200
+
+
+@pytest.mark.django_db
+def test_planification_preventive_reservee_gestion(api_client):
+    """Créer un plan = acte de gestion (ADMIN/RESP)."""
+    direction = User.objects.create_user(
+        username="dir_prev2", password="Pass1234!", role=User.Role.DIRECTION
+    )
+    api_client.force_authenticate(user=direction)
+    resp = api_client.post("/api/maintenance-plans/", {}, format="json")
+    assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_execution_preventive_reservee_technicien(api_client):
+    """start/finish : technicien et au-dessus ; les autres rôles = 403."""
+    soignant = User.objects.create_user(
+        username="soin_prev", password="Pass1234!", role=User.Role.PERSONNEL_SOIGNANT
+    )
+    api_client.force_authenticate(user=soignant)
+    resp = api_client.post("/api/maintenance-preventive/999999/start/", {}, format="json")
+    assert resp.status_code == 403
+
+    tech = User.objects.create_user(
+        username="tech_prev2", password="Pass1234!", role=User.Role.TECHNICIEN
+    )
+    api_client.force_authenticate(user=tech)
+    resp = api_client.post("/api/maintenance-plans/", {}, format="json")
+    assert resp.status_code == 403  # ne planifie pas
+    resp = api_client.post("/api/maintenance-preventive/999999/start/", {}, format="json")
+    assert resp.status_code == 404  # permission OK, objet introuvable
+    assert api_client.get("/api/maintenance-preventive/").status_code == 200  # mais consulte

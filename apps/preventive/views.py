@@ -1,10 +1,10 @@
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 
-from apps.accounts.permissions import CanManageEquipment
+from apps.accounts.permissions import CanManageEquipment, IsTechnicien
 from apps.accounts.scoping import scope_to_etablissement
 from apps.audit.mixins import AuditedCreateMixin
 from apps.audit.models import create_audit_log
@@ -27,6 +27,13 @@ class MaintenancePlanViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, CanManageEquipment]
     pagination_class = None
 
+    def get_permissions(self):
+        # Consultation ouverte (comme le reste des listes, cloisonnée par
+        # établissement) ; création/édition réservées à la gestion.
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), CanManageEquipment()]
+
 
 class MaintenancePreventiveViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     """Maintenances préventives avec transitions de statut et audit (RB-AUD-001)."""
@@ -36,6 +43,15 @@ class MaintenancePreventiveViewSet(AuditedCreateMixin, viewsets.ModelViewSet):
     audit_create_action = "preventive.create"
     audit_entite = "MaintenancePreventive"
     detail_serializer_class = MaintenancePreventiveDetailSerializer
+
+    def get_permissions(self):
+        # Lecture ouverte (cloisonnée) ; exécution start/finish par le
+        # technicien et au-dessus (RB-SEC-003) ; planification = gestion.
+        if self.request.method in SAFE_METHODS:
+            return [IsAuthenticated()]
+        if self.action in ("start", "finish"):
+            return [IsAuthenticated(), IsTechnicien()]
+        return [IsAuthenticated(), CanManageEquipment()]
 
     def get_queryset(self):
         return scope_to_etablissement(

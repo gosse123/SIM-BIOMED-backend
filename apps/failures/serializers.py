@@ -29,7 +29,7 @@ class PanneListSerializer(serializers.ModelSerializer):
         )
 
     def get_signale_par_nom(self, obj):
-        return f"{obj.signale_par.first_name} {obj.signale_par.last_name}"
+        return obj.signale_par.get_full_name().strip() or obj.signale_par.username
 
 
 class PanneDetailSerializer(serializers.ModelSerializer):

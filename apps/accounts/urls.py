@@ -22,6 +22,7 @@ urlpatterns = [
     path("auth/complete-profile/", views.complete_profile_view, name="complete_profile"),
     path("auth/etablissements/", views.etablissements_list_view, name="etablissements_list"),
     path("users/<int:pk>/deactivate/", views.deactivate_user_view, name="user_deactivate"),
+    path("users/<int:pk>/reactivate/", views.reactivate_user_view, name="user_reactivate"),
     path("users/<int:pk>/set-role/", views.set_role_view, name="user_set_role"),
     path("demandes/<int:pk>/approve/", views.approve_demande_view, name="demande_approve"),
     path("demandes/<int:pk>/reject/", views.reject_demande_view, name="demande_reject"),

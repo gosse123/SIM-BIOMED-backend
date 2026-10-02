@@ -432,3 +432,36 @@ def test_technicien_consulte_mais_ne_gere_pas_equipement(api_client, tech_user):
         format="json",
     )
     assert resp.status_code == 403
+
+
+# --- Lecture ouverte / exécution réservée (RB-SEC-003) ---
+
+
+@pytest.mark.django_db
+def test_consultation_interventions_ouverte_direction_et_soignant(
+    api_client, biomed_user, equipment, panne
+):
+    """La consultation est ouverte (cloisonnée) ; seuls écriture/suppression
+    sont restreintes."""
+    api_client.force_authenticate(user=biomed_user)
+    _quick_intervention(api_client, equipment, panne)
+    for username, role in (
+        ("dir_int", User.Role.DIRECTION),
+        ("soin_int", User.Role.PERSONNEL_SOIGNANT),
+    ):
+        user = User.objects.create_user(username=username, password="Pass1234!", role=role)
+        api_client.force_authenticate(user=user)
+        assert api_client.get("/api/interventions/").status_code == 200
+
+
+@pytest.mark.django_db
+def test_creation_interventions_reservee_roles_execution(api_client):
+    """Créer une intervention = exécution (ADMIN/RESP/TECH)."""
+    for username, role in (
+        ("dir_int2", User.Role.DIRECTION),
+        ("soin_int2", User.Role.PERSONNEL_SOIGNANT),
+    ):
+        user = User.objects.create_user(username=username, password="Pass1234!", role=role)
+        api_client.force_authenticate(user=user)
+        resp = api_client.post("/api/interventions/", {}, format="json")
+        assert resp.status_code == 403

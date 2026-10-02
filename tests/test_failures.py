@@ -261,3 +261,30 @@ def test_carte_transitions_en_test_alignee_doc():
     verifier_transition("EN_TEST", "EN_DIAGNOSTIC")  # autorisée
     with pytest.raises(TransitionInvalideError):
         verifier_transition("QUALIFIEE", "CLOSE")  # RB-CL-001 : saut interdit
+
+
+# --- Contrôle d'accès à l'édition (RB-SEC-002) ---
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "role", [User.Role.TECHNICIEN, User.Role.PERSONNEL_SOIGNANT, User.Role.DIRECTION]
+)
+def test_patch_panne_interdit_aux_roles_non_gestion(api_client, equipment, role):
+    """L'édition libre d'une panne est un acte de gestion (ADMIN/RESP) :
+    les transitions dédiées restent les seuls moyens de changer statut et
+    criticité pour les autres rôles."""
+    user = User.objects.create_user(username=f"pg_{role.lower()}", password="Pass1234!", role=role)
+    panne = Panne.objects.create(
+        equipement=equipment,
+        signale_par=user,
+        description_signalement="Test",
+        statut=Panne.Statut.SIGNALEE,
+    )
+    api_client.force_authenticate(user=user)
+    resp = api_client.patch(
+        f"/api/pannes/{panne.id}/",
+        {"observation_qualification": "tentative"},
+        format="json",
+    )
+    assert resp.status_code == 403

@@ -185,6 +185,33 @@ def deactivate_user_view(request, pk):
 
 @api_view(["POST"])
 @permission_classes([CanManageUsers])
+def reactivate_user_view(request, pk):
+    """Réactiver un utilisateur (du même établissement)."""
+    try:
+        target = scope_to_etablissement(
+            User.objects.all(), request.user, champ="etablissement"
+        ).get(pk=pk)
+    except User.DoesNotExist:
+        return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+
+    old_active = target.is_active
+    target.is_active = True
+    target.save(update_fields=["is_active"])
+
+    create_audit_log(
+        utilisateur=request.user,
+        action="user.reactivate",
+        entite="User",
+        entite_id=target.id,
+        ancienne_valeur={"is_active": old_active},
+        nouvelle_valeur={"is_active": True},
+    )
+
+    return Response({"detail": f"Utilisateur {target.username} réactivé."})
+
+
+@api_view(["POST"])
+@permission_classes([CanManageUsers])
 def set_role_view(request, pk):
     """Attribuer un rôle à un utilisateur (du même établissement)."""
     try:

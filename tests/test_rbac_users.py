@@ -248,6 +248,41 @@ class TestDeactivateUser:
         assert resp.status_code == 404
 
 
+# ======================== Reactivate User ========================
+
+
+@pytest.mark.django_db
+class TestReactivateUser:
+    def test_admin_can_reactivate_user(self, api_client, admin_user, tech_user):
+        token = _login(api_client, "admin_rbac", "Admin123!")
+        api_client.post(
+            f"/api/users/{tech_user.id}/deactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        tech_user.refresh_from_db()
+        assert tech_user.is_active is False
+
+        resp = api_client.post(
+            f"/api/users/{tech_user.id}/reactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        assert resp.status_code == 200
+        tech_user.refresh_from_db()
+        assert tech_user.is_active is True
+
+    def test_biomed_cannot_reactivate_user(self, api_client, biomed_user, tech_user):
+        token = _login(api_client, "biomed_rbac", "Biomed123!")
+        resp = api_client.post(
+            f"/api/users/{tech_user.id}/reactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        assert resp.status_code == 403
+
+    def test_reactivate_nonexistent_returns_404(self, api_client, admin_user):
+        token = _login(api_client, "admin_rbac", "Admin123!")
+        resp = api_client.post(
+            "/api/users/99999/reactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        assert resp.status_code == 404
+
+
 # ======================== Set Role ========================
 
 
@@ -497,3 +532,19 @@ class TestAuditLogs:
         log = logs.first()
         assert log.ancienne_valeur["role"] == "TECHNICIEN"
         assert log.nouvelle_valeur["role"] == "PERSONNEL_SOIGNANT"
+
+    def test_reactivate_creates_audit_log(self, api_client, admin_user, tech_user):
+        token = _login(api_client, "admin_rbac", "Admin123!")
+        api_client.post(
+            f"/api/users/{tech_user.id}/deactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+        api_client.post(
+            f"/api/users/{tech_user.id}/reactivate/", HTTP_AUTHORIZATION=f"Bearer {token}"
+        )
+
+        from apps.audit.models import AuditLog
+
+        logs = AuditLog.objects.filter(action="user.reactivate")
+        assert logs.exists()
+        log = logs.first()
+        assert log.nouvelle_valeur["is_active"] is True

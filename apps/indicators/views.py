@@ -1,8 +1,8 @@
 from django.db.models import Avg, DurationField, ExpressionWrapper, F
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import IsDirection
 from apps.accounts.scoping import scope_to_etablissement
 from apps.equipment.models import Equipment
 from apps.failures.models import Panne
@@ -15,7 +15,7 @@ class IndicateursView(APIView):
     MTTR = Mean Time To Repair = temps moyen de résolution
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsDirection]
 
     def get(self, request):
         equipements = scope_to_etablissement(
